@@ -219,17 +219,27 @@ class PlannerService {
 
       for (final b in allOccupied[day]!) {
         final labelLower = b.label.toLowerCase();
-        if ((labelLower.contains('commute') ||
-                labelLower.contains('college') ||
-                b.label == 'Free Time') &&
-            b.startMinutes >= 570) {
-          rawOccupied.add((
-            start: b.endMinutes,
-            end: min(kDayEndMinutes, b.endMinutes + 30),
-          ));
+        if (labelLower.contains('commute') ||
+            labelLower.contains('college') ||
+            b.label == 'Free Time') {
+          // Mandatory 20-min pre-college departure buffer
+          if (b.startMinutes >= dayStart) {
+            rawOccupied.add((
+              start: max(dayStart, b.startMinutes - kPreCollegeBufferMinutes),
+              end: b.startMinutes,
+            ));
+          }
+          // Post-college return & unwind buffer (30 min)
+          if (b.startMinutes >= 570) {
+            rawOccupied.add((
+              start: b.endMinutes,
+              end: min(kDayEndMinutes, b.endMinutes + kPostCollegeBufferMinutes),
+            ));
+          }
         } else if (labelLower.contains('gym')) {
+          // Mandatory 20-min pre-gym buffer
           rawOccupied.add((
-            start: max(dayStart, b.startMinutes - 20),
+            start: max(dayStart, b.startMinutes - kPreGymBufferMinutes),
             end: b.startMinutes,
           ));
         }
@@ -268,6 +278,41 @@ class PlannerService {
       for (int day = kMonday; day <= kSunday; day++)
         day: allOccupied[day]!.fold(0, (sum, b) => sum + b.durationMinutes),
     };
+
+    // ── Prior-Day Baseline Lock for Causal Invariance ──
+    // If deviations or college cancellations occur mid-week (e.g. Wednesday),
+    // lock in baseline allocations for all prior days (Monday, Tuesday) so prior days never change!
+    int minDevDay = kSunday + 1;
+    for (final dev in deviations) {
+      if (dev.dayOfWeek < minDevDay) {
+        minDevDay = dev.dayOfWeek;
+      }
+    }
+
+    if (deviations.isNotEmpty && minDevDay > kMonday && minDevDay <= kSunday) {
+      final baseline = computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targets,
+      );
+
+      for (int day = kMonday; day < minDevDay; day++) {
+        final dayFloating = baseline.dailySchedule[day]!
+            .where((b) => b.type == TimeBlockType.floating)
+            .toList();
+
+        for (final block in dayFloating) {
+          if (block.parentTargetId != null && allocations.containsKey(block.parentTargetId)) {
+            floatingBlocks.add(block);
+            allocations[block.parentTargetId]!.allocate(day, block.durationMinutes);
+            dailyTargetIds[day]!.add(block.parentTargetId!);
+            dailyFloatingMinutes[day] = dailyFloatingMinutes[day]! + block.durationMinutes;
+          }
+        }
+        // Free slots for prior days are already consumed by baseline blocks
+        freeSlotsByDay[day]!.clear();
+      }
+    }
 
     // Helper: determine if a day is treated as a regular college weekday
     // (True for Mon-Fri unless marked with accelerateWeek strategy)

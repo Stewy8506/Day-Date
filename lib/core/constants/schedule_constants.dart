@@ -14,6 +14,11 @@ const int kDayEndMinutes = 1439; // 23:59 PM
 const int kWeekendInterSessionBreakMinutes = 30; // 30-min break on weekends
 const int kWeekdayInterSessionBreakMinutes = 15; // 15-min break on weekdays
 
+/// Mandatory transition buffers (minutes)
+const int kPreCollegeBufferMinutes = 20; // 20-min buffer before College & Commute
+const int kPreGymBufferMinutes = 20; // 20-min buffer before Gym
+const int kPostCollegeBufferMinutes = 30; // 30-min buffer after College return
+
 /// Time affinity window boundaries (minutes since midnight).
 const int kMorningStart = 450; // 07:30 AM
 const int kMorningEnd = 720; // 12:00 PM

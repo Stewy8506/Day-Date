@@ -313,6 +313,37 @@ void main() {
       }
     });
 
+    test('mandatory 20-minute gap enforced before college departure on college weekdays', () {
+      final result = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targets,
+      );
+
+      for (int day = kMonday; day <= kFriday; day++) {
+        final dayBlocks = result.dailySchedule[day]!;
+        final collegeBlock = dayBlocks.firstWhere(
+          (b) => b.type == TimeBlockType.fixed && b.label.toLowerCase().contains('college'),
+          orElse: () => dayBlocks.first,
+        );
+
+        final preCollegeFloating = dayBlocks.where(
+          (b) => b.type == TimeBlockType.floating && b.startMinutes < collegeBlock.startMinutes,
+        ).toList();
+
+        for (final block in preCollegeFloating) {
+          final gap = collegeBlock.startMinutes - block.endMinutes;
+          expect(
+            gap,
+            greaterThanOrEqualTo(kPreCollegeBufferMinutes),
+            reason: 'Day $day: "${block.label}" ends at ${formatMinutes(block.endMinutes)}, '
+                'which is only ${gap}m before College starts at ${formatMinutes(collegeBlock.startMinutes)}. '
+                'Expected at least ${kPreCollegeBufferMinutes}m gap.',
+          );
+        }
+      }
+    });
+
     test('affinity biasing: CAT Prep is predominantly before noon', () {
       final result = planner.computeWeeklySchedule(
         fixedBlocks: fixedBlocks,
@@ -771,23 +802,17 @@ void main() {
         targets: targets,
       );
 
-      // Compute total floating minutes on Fri+Sat+Sun for both.
-      int weekendFloating(ScheduleResult r) {
-        int total = 0;
-        for (final day in [kFriday, kSaturday, kSunday]) {
-          total += r.dailySchedule[day]!
-              .where((b) => b.type == TimeBlockType.floating)
-              .fold(0, (sum, b) => sum + b.durationMinutes);
-        }
-        return total;
-      }
+      final baselineTue = baseline.dailySchedule[kTuesday]!
+          .where((b) => b.type == TimeBlockType.floating)
+          .fold(0, (sum, b) => sum + b.durationMinutes);
 
-      final baselineWeekend = weekendFloating(baseline);
-      final offDayWeekend = weekendFloating(withOff);
+      final withOffTue = withOff.dailySchedule[kTuesday]!
+          .where((b) => b.type == TimeBlockType.floating)
+          .fold(0, (sum, b) => sum + b.durationMinutes);
 
-      expect(offDayWeekend, lessThanOrEqualTo(baselineWeekend),
-          reason: 'Weekend should have equal or fewer floating hours '
-              'when Tuesday quotas were fulfilled early');
+      expect(withOffTue, greaterThan(baselineTue + 200),
+          reason: 'Tuesday off-day should absorb substantial floating work '
+              'to accelerate the week');
     });
 
     test('all floating blocks maintain minimum duration (kMinBlockMinutes)', () {
@@ -881,6 +906,60 @@ void main() {
           (b) => b.label == 'Gym' && b.type == TimeBlockType.fixed);
       expect(hasGym, isTrue,
           reason: 'Gym block should be preserved on Tuesday');
+    });
+
+    test('cancellation on Wednesday keeps Monday and Tuesday 100% identical to baseline', () {
+      final deviation = ScheduleDeviation(
+        id: 'college-off-wed',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kWednesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.accelerateWeek,
+        date: DateTime(2026, 8, 20),
+      );
+
+      final baseline = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targets,
+      );
+
+      final withWedOff = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      // Monday must be 100% identical to baseline
+      final baselineMon = baseline.dailySchedule[kMonday]!;
+      final wedOffMon = withWedOff.dailySchedule[kMonday]!;
+      expect(wedOffMon.length, equals(baselineMon.length),
+          reason: 'Monday block count changed after Wednesday cancellation');
+      for (int i = 0; i < baselineMon.length; i++) {
+        expect(wedOffMon[i].label, equals(baselineMon[i].label));
+        expect(wedOffMon[i].startMinutes, equals(baselineMon[i].startMinutes));
+        expect(wedOffMon[i].endMinutes, equals(baselineMon[i].endMinutes));
+      }
+
+      // Tuesday must be 100% identical to baseline
+      final baselineTue = baseline.dailySchedule[kTuesday]!;
+      final wedOffTue = withWedOff.dailySchedule[kTuesday]!;
+      expect(wedOffTue.length, equals(baselineTue.length),
+          reason: 'Tuesday block count changed after Wednesday cancellation');
+      for (int i = 0; i < baselineTue.length; i++) {
+        expect(wedOffTue[i].label, equals(baselineTue[i].label));
+        expect(wedOffTue[i].startMinutes, equals(baselineTue[i].startMinutes));
+        expect(wedOffTue[i].endMinutes, equals(baselineTue[i].endMinutes));
+      }
+
+      // Wednesday must have NO college blocks and absorb floating work
+      final wedBlocks = withWedOff.dailySchedule[kWednesday]!;
+      final hasCollege = wedBlocks.any((b) => b.label.toLowerCase().contains('college'));
+      expect(hasCollege, isFalse, reason: 'Wednesday should have no college blocks');
+      final wedFloating = wedBlocks.where((b) => b.type == TimeBlockType.floating).toList();
+      expect(wedFloating, isNotEmpty, reason: 'Wednesday should absorb floating blocks in freed time');
     });
   });
 

@@ -102,8 +102,6 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
     final sortedBlocks = List<TimeBlock>.from(widget.blocks)
       ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
 
-    final freeGaps = _computeFreeGaps(sortedBlocks, startHour);
-
     return SingleChildScrollView(
       controller: _scrollController,
       physics: const BouncingScrollPhysics(),
@@ -169,59 +167,10 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
               );
             }),
 
-            // ── 3. Visual Free Time Gaps ────────────────
-            ...freeGaps.map((gap) {
-              final top = (gap.start - (startHour * 60)) * kPixelsPerMinute;
-              final height = gap.duration * kPixelsPerMinute - 4;
-              if (height < 18) return const SizedBox.shrink();
-
-              final isLunchWindow = gap.start >= 840 && gap.end <= 930;
-
-              return Positioned(
-                top: top + 2,
-                left: kTimeColumnWidth + 8,
-                right: 16,
-                height: max(18, height),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isLunchWindow
-                        ? AppColors.surfaceElevated.withValues(alpha: 0.35)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isLunchWindow
-                          ? AppColors.accentWarm.withValues(alpha: 0.15)
-                          : AppColors.divider.withValues(alpha: 0.2),
-                      style: BorderStyle.solid,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isLunchWindow ? Icons.restaurant_outlined : Icons.schedule_outlined,
-                        size: 11,
-                        color: isLunchWindow ? AppColors.accentWarm : AppColors.textDisabled,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isLunchWindow
-                            ? 'Weekend Lunch & Rest (${formatDuration(gap.duration)})'
-                            : 'Free Window · ${formatDuration(gap.duration)}',
-                        style: AppTypography.caption(
-                          color: isLunchWindow ? AppColors.accentWarm : AppColors.textDisabled,
-                        ).copyWith(fontSize: 10, fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-
-            // ── 4. Proportional Event Blocks ────────────
+            // ── 3. Proportional Event Blocks ────────────
             ...sortedBlocks.map((block) {
               final top = (block.startMinutes - (startHour * 60)) * kPixelsPerMinute;
-              final height = max(48.0, (block.durationMinutes * kPixelsPerMinute) - 4);
+              final height = max(52.0, (block.durationMinutes * kPixelsPerMinute) - 4);
 
               // Find completion record if any
               final completion = completions.cast<TaskCompletion?>().firstWhere(
@@ -275,7 +224,7 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
                           // Left Category Accent Node
                           Container(
                             width: 3.5,
-                            height: max(20, height - 16),
+                            height: max(22, height - 16),
                             decoration: BoxDecoration(
                               color: isCompleted
                                   ? AppColors.accentSage
@@ -301,73 +250,77 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
                                   completion: completion,
                                 );
                               },
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Category Eyebrow Tag
-                                  Row(
-                                    children: [
-                                      Text(
-                                        isFocus
-                                            ? 'FOCUS'
-                                            : isGym
-                                                ? 'TRAINING'
-                                                : 'ANCHOR',
-                                        style: AppTypography.overline(
-                                          color: isCompleted
-                                              ? AppColors.accentSage
-                                              : isFocus
-                                                  ? AppColors.accentWarm
-                                                  : AppColors.textTertiary,
-                                        ).copyWith(fontSize: 8.0, height: 1.1),
-                                      ),
-                                      if (isCompleted) ...[
-                                        const SizedBox(width: 5),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.accentSageSubtle,
-                                            borderRadius: BorderRadius.circular(3),
-                                          ),
-                                          child: Text(
-                                            'DONE',
-                                            style: AppTypography.overline(color: AppColors.accentSage)
-                                                .copyWith(fontSize: 7.5, height: 1.1),
-                                          ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Category Eyebrow Tag
+                                    Row(
+                                      children: [
+                                        Text(
+                                          isFocus
+                                              ? 'FOCUS'
+                                              : isGym
+                                                  ? 'TRAINING'
+                                                  : 'ANCHOR',
+                                          style: AppTypography.overline(
+                                            color: isCompleted
+                                                ? AppColors.accentSage
+                                                : isFocus
+                                                    ? AppColors.accentWarm
+                                                    : AppColors.textTertiary,
+                                          ).copyWith(fontSize: 8.0, height: 1.1),
                                         ),
+                                        if (isCompleted) ...[
+                                          const SizedBox(width: 5),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.accentSageSubtle,
+                                              borderRadius: BorderRadius.circular(3),
+                                            ),
+                                            child: Text(
+                                              'DONE',
+                                              style: AppTypography.overline(color: AppColors.accentSage)
+                                                  .copyWith(fontSize: 7.5, height: 1.1),
+                                            ),
+                                          ),
+                                        ],
                                       ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 1),
-
-                                  // Block Title
-                                  Text(
-                                    block.label,
-                                    style: AppTypography.cardTitle(
-                                      color: isCompleted ? AppColors.textSecondary : AppColors.textPrimary,
-                                    ).copyWith(
-                                      fontSize: height < 60 ? 12.5 : 13.0,
-                                      height: 1.15,
-                                      decoration: isCompleted ? TextDecoration.lineThrough : null,
-                                      decorationColor: AppColors.accentSage,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 1),
+                                    const SizedBox(height: 1),
 
-                                  // Time and Duration
-                                  Text(
-                                    '${formatMinutes(block.startMinutes)} – ${formatMinutes(block.endMinutes)} (${formatDuration(block.durationMinutes)})',
-                                    style: AppTypography.monoTime(
-                                      color: isCompleted ? AppColors.textDisabled : AppColors.textSecondary,
-                                    ).copyWith(fontSize: 9.5, height: 1.1),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                                    // Block Title
+                                    Text(
+                                      block.label,
+                                      style: AppTypography.cardTitle(
+                                        color: isCompleted ? AppColors.textSecondary : AppColors.textPrimary,
+                                      ).copyWith(
+                                        fontSize: 13.0,
+                                        height: 1.15,
+                                        decoration: isCompleted ? TextDecoration.lineThrough : null,
+                                        decorationColor: AppColors.accentSage,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 1),
+
+                                    // Time and Duration
+                                    Text(
+                                      '${formatMinutes(block.startMinutes)} – ${formatMinutes(block.endMinutes)} (${formatDuration(block.durationMinutes)})',
+                                      style: AppTypography.monoTime(
+                                        color: isCompleted ? AppColors.textDisabled : AppColors.textSecondary,
+                                      ).copyWith(fontSize: 9.5, height: 1.1),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -445,29 +398,5 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
     if (hour == 12) return '12 PM';
     if (hour > 12) return '${hour - 12} PM';
     return '$hour AM';
-  }
-
-  List<({int start, int end, int duration})> _computeFreeGaps(List<TimeBlock> sortedBlocks, int startHour) {
-    final gaps = <({int start, int end, int duration})>[];
-    int currentPointer = startHour * 60;
-
-    for (final block in sortedBlocks) {
-      if (block.startMinutes > currentPointer) {
-        final gapDuration = block.startMinutes - currentPointer;
-        if (gapDuration >= 20) {
-          gaps.add((start: currentPointer, end: block.startMinutes, duration: gapDuration));
-        }
-      }
-      currentPointer = max(currentPointer, block.endMinutes);
-    }
-
-    if (currentPointer < (kTimelineEndHour * 60)) {
-      final gapDuration = (kTimelineEndHour * 60) - currentPointer;
-      if (gapDuration >= 20) {
-        gaps.add((start: currentPointer, end: kTimelineEndHour * 60, duration: gapDuration));
-      }
-    }
-
-    return gaps;
   }
 }
