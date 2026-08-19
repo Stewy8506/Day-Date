@@ -22,6 +22,10 @@ class _AddDeviationSheetState extends ConsumerState<AddDeviationSheet> {
   TimeOfDay _startTime = const TimeOfDay(hour: 10, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 12, minute: 0);
   DeviationType _deviationType = DeviationType.blockout;
+  OffDayStrategy _offDayStrategy = OffDayStrategy.accelerateWeek;
+
+  bool get _isCollegeCancellation =>
+      _deviationType == DeviationType.collegeCancellation;
 
   @override
   void dispose() {
@@ -63,58 +67,6 @@ class _AddDeviationSheetState extends ConsumerState<AddDeviationSheet> {
             ),
             const SizedBox(height: 20),
 
-            // Label
-            TextField(
-              controller: _labelController,
-              decoration: const InputDecoration(
-                labelText: 'Label',
-                hintText: 'e.g., Outing, Doctor appointment',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Day picker
-            DropdownButtonFormField<int>(
-              initialValue: _selectedDay,
-              decoration: const InputDecoration(
-                labelText: 'Day',
-                border: OutlineInputBorder(),
-              ),
-              items: kDayNames.entries
-                  .map((e) => DropdownMenuItem(
-                        value: e.key,
-                        child: Text(e.value),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _selectedDay = v);
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Time pickers
-            Row(
-              children: [
-                Expanded(
-                  child: _TimePicker(
-                    label: 'Start',
-                    time: _startTime,
-                    onChanged: (t) => setState(() => _startTime = t),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _TimePicker(
-                    label: 'End',
-                    time: _endTime,
-                    onChanged: (t) => setState(() => _endTime = t),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
             // Type toggle
             SegmentedButton<DeviationType>(
               segments: const [
@@ -128,18 +80,123 @@ class _AddDeviationSheetState extends ConsumerState<AddDeviationSheet> {
                   label: Text('Extension'),
                   icon: Icon(Icons.add_circle_outline),
                 ),
+                ButtonSegment(
+                  value: DeviationType.collegeCancellation,
+                  label: Text('College Off'),
+                  icon: Icon(Icons.school_outlined),
+                ),
               ],
               selected: {_deviationType},
               onSelectionChanged: (s) =>
                   setState(() => _deviationType = s.first),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+
+            // Label (auto-filled for college cancellation)
+            if (!_isCollegeCancellation)
+              TextField(
+                controller: _labelController,
+                decoration: const InputDecoration(
+                  labelText: 'Label',
+                  hintText: 'e.g., Outing, Doctor appointment',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            if (!_isCollegeCancellation) const SizedBox(height: 16),
+
+            // Day picker
+            DropdownButtonFormField<int>(
+              initialValue: _selectedDay,
+              decoration: InputDecoration(
+                labelText: _isCollegeCancellation ? 'College Off Day' : 'Day',
+                border: const OutlineInputBorder(),
+              ),
+              items: kDayNames.entries
+                  .map((e) => DropdownMenuItem(
+                        value: e.key,
+                        child: Text(e.value),
+                      ))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _selectedDay = v);
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Time pickers — only for blockout/extension
+            if (!_isCollegeCancellation) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: _TimePicker(
+                      label: 'Start',
+                      time: _startTime,
+                      onChanged: (t) => setState(() => _startTime = t),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _TimePicker(
+                      label: 'End',
+                      time: _endTime,
+                      onChanged: (t) => setState(() => _endTime = t),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Off-day strategy — only for college cancellation
+            if (_isCollegeCancellation) ...[
+              const Text(
+                'Re-balancing Strategy',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              RadioGroup<OffDayStrategy>(
+                groupValue: _offDayStrategy,
+                onChanged: (v) {
+                  if (v != null) setState(() => _offDayStrategy = v);
+                },
+                child: Column(
+                  children: [
+                    RadioListTile<OffDayStrategy>(
+                      title: const Text('Accelerate Week'),
+                      subtitle: const Text(
+                        'Use freed hours for study/work targets',
+                      ),
+                      value: OffDayStrategy.accelerateWeek,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+                    RadioListTile<OffDayStrategy>(
+                      title: const Text('Rest & Leisure'),
+                      subtitle: const Text(
+                        'Keep freed hours as unallocated free time',
+                      ),
+                      value: OffDayStrategy.restAndLeisure,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+
+            const SizedBox(height: 8),
 
             // Submit
             FilledButton.icon(
               onPressed: _submit,
               icon: const Icon(Icons.check),
-              label: const Text('Add Deviation'),
+              label: Text(
+                  _isCollegeCancellation ? 'Mark College Off' : 'Add Deviation'),
             ),
           ],
         ),
@@ -148,6 +205,40 @@ class _AddDeviationSheetState extends ConsumerState<AddDeviationSheet> {
   }
 
   void _submit() {
+    if (_isCollegeCancellation) {
+      _submitCollegeCancellation();
+    } else {
+      _submitRegularDeviation();
+    }
+  }
+
+  void _submitCollegeCancellation() {
+    // Use a reference date — today's week for the selected day.
+    final now = DateTime.now();
+    final currentWeekday = now.weekday;
+    final daysUntilTarget = (_selectedDay - currentWeekday) % 7;
+    final targetDate = DateTime(
+      now.year,
+      now.month,
+      now.day + daysUntilTarget,
+    );
+
+    final deviation = ScheduleDeviation(
+      id: const Uuid().v4(),
+      label: 'College Off',
+      type: DeviationType.collegeCancellation,
+      dayOfWeek: _selectedDay,
+      startMinutes: 0,
+      endMinutes: 0,
+      offDayStrategy: _offDayStrategy,
+      date: targetDate,
+    );
+
+    ref.read(addDeviationProvider)(deviation);
+    Navigator.of(context).pop();
+  }
+
+  void _submitRegularDeviation() {
     final label = _labelController.text.trim();
     if (label.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

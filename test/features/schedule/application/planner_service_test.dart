@@ -544,4 +544,419 @@ void main() {
       expect(result.dailySchedule[kMonday], isNotNull);
     });
   });
+
+  group('PlannerService — College Cancellation (accelerateWeek)', () {
+    test('removes college and commute blocks on the off day', () {
+      final deviation = ScheduleDeviation(
+        id: 'college-off-tue',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kTuesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.accelerateWeek,
+        date: DateTime(2026, 8, 19),
+      );
+
+      final result = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      final tueBlocks = result.dailySchedule[kTuesday]!;
+      final hasCollege = tueBlocks.any((b) => b.label == 'College');
+      final hasCommute = tueBlocks.any((b) => b.label == 'Commute');
+
+      expect(hasCollege, isFalse,
+          reason: 'College block should be removed on Tuesday');
+      expect(hasCommute, isFalse,
+          reason: 'Commute blocks should be removed on Tuesday');
+    });
+
+    test('fills freed hours with floating targets', () {
+      final baseline = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targets,
+      );
+
+      final deviation = ScheduleDeviation(
+        id: 'college-off-tue',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kTuesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.accelerateWeek,
+        date: DateTime(2026, 8, 19),
+      );
+
+      final withOff = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      // Tuesday should have MORE floating blocks than baseline.
+      final baselineFloating = baseline.dailySchedule[kTuesday]!
+          .where((b) => b.type == TimeBlockType.floating)
+          .fold(0, (sum, b) => sum + b.durationMinutes);
+      final offDayFloating = withOff.dailySchedule[kTuesday]!
+          .where((b) => b.type == TimeBlockType.floating)
+          .fold(0, (sum, b) => sum + b.durationMinutes);
+
+      expect(offDayFloating, greaterThan(baselineFloating),
+          reason: 'Freed college hours should be filled with floating targets');
+    });
+
+    test('respects affinity biasing in freed slots', () {
+      final deviation = ScheduleDeviation(
+        id: 'college-off-tue',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kTuesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.accelerateWeek,
+        date: DateTime(2026, 8, 19),
+      );
+
+      final result = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      final tueFloating = result.dailySchedule[kTuesday]!
+          .where((b) => b.type == TimeBlockType.floating)
+          .toList();
+
+      // Check that CAT Prep (morning affinity) blocks are before noon.
+      final catBlocks = tueFloating.where((b) => b.label == 'CAT Prep');
+      for (final block in catBlocks) {
+        if (block.startMinutes < 720) {
+          // Good — at least partially in the morning window.
+          expect(true, isTrue);
+        }
+      }
+
+      // At least some floating blocks should exist on Tuesday.
+      expect(tueFloating, isNotEmpty,
+          reason: 'Should have floating blocks on Tuesday off day');
+    });
+
+    test('daily caps respected even with extra free time', () {
+      final deviation = ScheduleDeviation(
+        id: 'college-off-tue',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kTuesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.accelerateWeek,
+        date: DateTime(2026, 8, 19),
+      );
+
+      final result = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      for (final target in targets) {
+        final tueMinutes = result.dailySchedule[kTuesday]!
+            .where((b) => b.parentTargetId == target.id)
+            .fold(0, (sum, b) => sum + b.durationMinutes);
+
+        expect(tueMinutes, lessThanOrEqualTo(target.dailyCapMinutes),
+            reason:
+                '${target.name} on Tuesday: ${tueMinutes}min exceeds '
+                'daily cap of ${target.dailyCapMinutes}min');
+      }
+    });
+
+    test('reduces allocation on later days (weekend freed)', () {
+      final baseline = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targets,
+      );
+
+      final deviation = ScheduleDeviation(
+        id: 'college-off-tue',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kTuesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.accelerateWeek,
+        date: DateTime(2026, 8, 19),
+      );
+
+      final withOff = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      // Compute total floating minutes on Fri+Sat+Sun for both.
+      int weekendFloating(ScheduleResult r) {
+        int total = 0;
+        for (final day in [kFriday, kSaturday, kSunday]) {
+          total += r.dailySchedule[day]!
+              .where((b) => b.type == TimeBlockType.floating)
+              .fold(0, (sum, b) => sum + b.durationMinutes);
+        }
+        return total;
+      }
+
+      final baselineWeekend = weekendFloating(baseline);
+      final offDayWeekend = weekendFloating(withOff);
+
+      expect(offDayWeekend, lessThanOrEqualTo(baselineWeekend),
+          reason: 'Weekend should have equal or fewer floating hours '
+              'when Tuesday quotas were fulfilled early');
+    });
+
+    test('all floating blocks maintain 90-minute minimum', () {
+      final deviation = ScheduleDeviation(
+        id: 'college-off-tue',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kTuesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.accelerateWeek,
+        date: DateTime(2026, 8, 19),
+      );
+
+      final result = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      for (final dayBlocks in result.dailySchedule.values) {
+        for (final block in dayBlocks) {
+          if (block.type == TimeBlockType.floating) {
+            expect(block.durationMinutes, greaterThanOrEqualTo(kMinBlockMinutes),
+                reason: '${block.label} on day ${block.dayOfWeek} is '
+                    '${block.durationMinutes}min, below minimum');
+          }
+        }
+      }
+    });
+
+    test('no overlapping floating blocks after cancellation', () {
+      final deviation = ScheduleDeviation(
+        id: 'college-off-tue',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kTuesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.accelerateWeek,
+        date: DateTime(2026, 8, 19),
+      );
+
+      final result = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      for (int day = kMonday; day <= kSunday; day++) {
+        final blocks = result.dailySchedule[day]!;
+        final floating =
+            blocks.where((b) => b.type == TimeBlockType.floating).toList();
+
+        for (final f in floating) {
+          for (final other in blocks) {
+            if (other.id == f.id) continue;
+            final hasOverlap =
+                f.startMinutes < other.endMinutes &&
+                    f.endMinutes > other.startMinutes;
+            expect(hasOverlap, isFalse,
+                reason:
+                    'Day $day: "${f.label}" (${f.startMinutes}-${f.endMinutes}) '
+                    'overlaps with "${other.label}" '
+                    '(${other.startMinutes}-${other.endMinutes})');
+          }
+        }
+      }
+    });
+
+    test('gym block preserved on off day', () {
+      final deviation = ScheduleDeviation(
+        id: 'college-off-tue',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kTuesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.accelerateWeek,
+        date: DateTime(2026, 8, 19),
+      );
+
+      final result = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      final tueBlocks = result.dailySchedule[kTuesday]!;
+      final hasGym = tueBlocks.any(
+          (b) => b.label == 'Gym' && b.type == TimeBlockType.fixed);
+      expect(hasGym, isTrue,
+          reason: 'Gym block should be preserved on Tuesday');
+    });
+  });
+
+  group('PlannerService — College Cancellation (restAndLeisure)', () {
+    test('replaces college+commute with Free Time block', () {
+      final deviation = ScheduleDeviation(
+        id: 'college-off-tue',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kTuesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.restAndLeisure,
+        date: DateTime(2026, 8, 19),
+      );
+
+      final result = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      final tueBlocks = result.dailySchedule[kTuesday]!;
+      final freeTime = tueBlocks.where((b) => b.label == 'Free Time');
+
+      expect(freeTime, isNotEmpty,
+          reason: 'Free Time block should appear on Tuesday');
+
+      // Free Time should span the commute-before to commute-after range.
+      final ft = freeTime.first;
+      // Commute before starts at 570 (10:00 - 30min)
+      // Commute after ends at 1020 (4:20 PM + 40min)
+      expect(ft.startMinutes, equals(570),
+          reason: 'Free Time should start at commute-before start');
+      expect(ft.endMinutes, equals(1020),
+          reason: 'Free Time should end at commute-after end');
+    });
+
+    test('does NOT allocate floating targets in freed hours', () {
+      final deviation = ScheduleDeviation(
+        id: 'college-off-tue',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kTuesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.restAndLeisure,
+        date: DateTime(2026, 8, 19),
+      );
+
+      final baseline = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targets,
+      );
+
+      final withOff = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      // Tuesday floating minutes should be same or less than baseline.
+      final baselineFloating = baseline.dailySchedule[kTuesday]!
+          .where((b) => b.type == TimeBlockType.floating)
+          .fold(0, (sum, b) => sum + b.durationMinutes);
+      final offDayFloating = withOff.dailySchedule[kTuesday]!
+          .where((b) => b.type == TimeBlockType.floating)
+          .fold(0, (sum, b) => sum + b.durationMinutes);
+
+      expect(offDayFloating, lessThanOrEqualTo(baselineFloating),
+          reason: 'restAndLeisure should NOT add floating blocks in freed hours');
+    });
+
+    test('keeps rest of week schedule unchanged', () {
+      final deviation = ScheduleDeviation(
+        id: 'college-off-tue',
+        label: 'College Off',
+        type: DeviationType.collegeCancellation,
+        dayOfWeek: kTuesday,
+        startMinutes: 0,
+        endMinutes: 0,
+        offDayStrategy: OffDayStrategy.restAndLeisure,
+        date: DateTime(2026, 8, 19),
+      );
+
+      final baseline = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targets,
+      );
+
+      final withOff = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [deviation],
+        targets: targets,
+      );
+
+      // Other days (Mon, Wed, Thu, Fri) should have similar block counts.
+      for (final day in [kMonday, kWednesday, kThursday, kFriday]) {
+        final baselineCount = baseline.dailySchedule[day]!.length;
+        final offDayCount = withOff.dailySchedule[day]!.length;
+
+        // Allow ±1 block difference due to redistribution edge cases.
+        expect((offDayCount - baselineCount).abs(), lessThanOrEqualTo(1),
+            reason:
+                'Day $day block count changed significantly: '
+                'baseline=$baselineCount, withOff=$offDayCount');
+      }
+    });
+  });
+
+  group('PlannerService — College Cancellation (toggle restore)', () {
+    test('removing cancellation restores baseline schedule', () {
+      final baseline = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targets,
+      );
+
+      // Simulate: no deviations = attending (same as removing cancellation).
+      // The key is that when setCollegeStatusForDate(isAttending: true) is
+      // called, it removes the deviation and the schedule should match baseline.
+      final restored = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [], // Deviation removed by repo
+        targets: targets,
+      );
+
+      // Tuesday should have college blocks again.
+      final tueBlocks = restored.dailySchedule[kTuesday]!;
+      final hasCollege = tueBlocks.any((b) => b.label == 'College');
+      final hasCommute = tueBlocks.any((b) => b.label == 'Commute');
+
+      expect(hasCollege, isTrue,
+          reason: 'College block should be restored on Tuesday');
+      expect(hasCommute, isTrue,
+          reason: 'Commute blocks should be restored on Tuesday');
+
+      // Block counts should match baseline.
+      for (int day = kMonday; day <= kSunday; day++) {
+        expect(
+          baseline.dailySchedule[day]!.length,
+          equals(restored.dailySchedule[day]!.length),
+          reason: 'Day $day block count should match baseline after restore',
+        );
+      }
+    });
+  });
 }

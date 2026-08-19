@@ -93,3 +93,18 @@ final removeDeviationProvider = Provider<Future<void> Function(String)>(
     return (id) => repo.removeDeviation(id);
   },
 );
+
+/// Provider for toggling college attendance on a specific date.
+/// Triggers schedule recomputation automatically via the Hive watch stream.
+final setCollegeStatusProvider = Provider<
+    Future<void> Function(DateTime date,
+        {required bool isAttending, OffDayStrategy strategy})>(
+  (ref) {
+    final repo = ref.watch(scheduleRepositoryProvider);
+    return (date,
+            {required isAttending,
+            strategy = OffDayStrategy.accelerateWeek}) =>
+        repo.setCollegeStatusForDate(date,
+            isAttending: isAttending, strategy: strategy);
+  },
+);

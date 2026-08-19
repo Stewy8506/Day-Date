@@ -10,6 +10,7 @@ import 'package:day_date/features/schedule/data/models/time_block_model.dart';
 extension HiveRegistrar on HiveInterface {
   void registerAdapters() {
     registerAdapter(DeviationTypeModelAdapter());
+    registerAdapter(OffDayStrategyModelAdapter());
     registerAdapter(ScheduleDeviationModelAdapter());
     registerAdapter(TaskTargetModelAdapter());
     registerAdapter(TimeAffinityModelAdapter());
@@ -21,6 +22,7 @@ extension HiveRegistrar on HiveInterface {
 extension IsolatedHiveRegistrar on IsolatedHiveInterface {
   void registerAdapters() {
     registerAdapter(DeviationTypeModelAdapter());
+    registerAdapter(OffDayStrategyModelAdapter());
     registerAdapter(ScheduleDeviationModelAdapter());
     registerAdapter(TaskTargetModelAdapter());
     registerAdapter(TimeAffinityModelAdapter());

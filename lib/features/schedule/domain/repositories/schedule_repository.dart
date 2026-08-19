@@ -31,6 +31,18 @@ abstract class ScheduleRepository {
   /// Returns true if this is the first launch (no data seeded yet).
   Future<bool> isFirstLaunch();
 
+  /// Sets college attendance status for a specific calendar date.
+  ///
+  /// When [isAttending] is false, creates a `collegeCancellation` deviation
+  /// for [date] with the given [strategy].
+  /// When [isAttending] is true, removes any existing college cancellation
+  /// deviation for that date, restoring the baseline schedule.
+  Future<void> setCollegeStatusForDate(
+    DateTime date, {
+    required bool isAttending,
+    OffDayStrategy strategy = OffDayStrategy.accelerateWeek,
+  });
+
   /// Watches for any data changes (deviations added/removed, etc.)
   /// and emits a notification on each change.
   Stream<void> watchAllChanges();

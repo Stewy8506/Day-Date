@@ -124,6 +124,8 @@ extension ScheduleDeviationModelMapper on ScheduleDeviationModel {
         endMinutes: endMinutes,
         extendsBlockId: extendsBlockId,
         extensionMinutes: extensionMinutes,
+        offDayStrategy: _toEntityStrategy(offDayStrategyModel),
+        date: date,
       );
 
   static DeviationType _toEntityType(DeviationTypeModel model) {
@@ -132,6 +134,18 @@ extension ScheduleDeviationModelMapper on ScheduleDeviationModel {
         return DeviationType.blockout;
       case DeviationTypeModel.extension:
         return DeviationType.extension;
+      case DeviationTypeModel.collegeCancellation:
+        return DeviationType.collegeCancellation;
+    }
+  }
+
+  static OffDayStrategy? _toEntityStrategy(OffDayStrategyModel? model) {
+    if (model == null) return null;
+    switch (model) {
+      case OffDayStrategyModel.accelerateWeek:
+        return OffDayStrategy.accelerateWeek;
+      case OffDayStrategyModel.restAndLeisure:
+        return OffDayStrategy.restAndLeisure;
     }
   }
 }
@@ -146,6 +160,8 @@ extension ScheduleDeviationEntityMapper on ScheduleDeviation {
         endMinutes: endMinutes,
         extendsBlockId: extendsBlockId,
         extensionMinutes: extensionMinutes,
+        offDayStrategyModel: _toModelStrategy(offDayStrategy),
+        date: date,
       );
 
   static DeviationTypeModel _toModelType(DeviationType type) {
@@ -154,6 +170,19 @@ extension ScheduleDeviationEntityMapper on ScheduleDeviation {
         return DeviationTypeModel.blockout;
       case DeviationType.extension:
         return DeviationTypeModel.extension;
+      case DeviationType.collegeCancellation:
+        return DeviationTypeModel.collegeCancellation;
+    }
+  }
+
+  static OffDayStrategyModel? _toModelStrategy(OffDayStrategy? strategy) {
+    if (strategy == null) return null;
+    switch (strategy) {
+      case OffDayStrategy.accelerateWeek:
+        return OffDayStrategyModel.accelerateWeek;
+      case OffDayStrategy.restAndLeisure:
+        return OffDayStrategyModel.restAndLeisure;
     }
   }
 }
+

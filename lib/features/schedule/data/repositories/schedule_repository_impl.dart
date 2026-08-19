@@ -4,6 +4,7 @@ library;
 import 'package:day_date/core/constants/schedule_constants.dart';
 import 'package:day_date/features/schedule/data/datasources/local_schedule_datasource.dart';
 import 'package:day_date/features/schedule/data/models/model_mappers.dart';
+import 'package:day_date/features/schedule/data/models/schedule_deviation_model.dart';
 import 'package:day_date/features/schedule/data/models/task_target_model.dart';
 import 'package:day_date/features/schedule/data/models/time_block_model.dart';
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
@@ -154,6 +155,54 @@ class ScheduleRepositoryImpl implements ScheduleRepository {
 
     await _datasource.seedTaskTargets(targets);
     await _datasource.markSeeded();
+  }
+
+  @override
+  Future<void> setCollegeStatusForDate(
+    DateTime date, {
+    required bool isAttending,
+    OffDayStrategy strategy = OffDayStrategy.accelerateWeek,
+  }) async {
+    final dayOfWeek = date.weekday;
+
+    // Find existing collegeCancellation deviations for this day.
+    final existing = _datasource.getDeviations().where((d) =>
+        d.typeModel == DeviationTypeModel.collegeCancellation &&
+        d.dayOfWeek == dayOfWeek &&
+        _isSameDate(d.date, date));
+
+    if (!isAttending) {
+      // Mark as off — create deviation if not already present.
+      if (existing.isEmpty) {
+        final deviation = ScheduleDeviationModel.create(
+          id: const Uuid().v4(),
+          label: 'College Off',
+          typeModel: DeviationTypeModel.collegeCancellation,
+          dayOfWeek: dayOfWeek,
+          startMinutes: 0,
+          endMinutes: 0,
+          offDayStrategyModel: strategy == OffDayStrategy.restAndLeisure
+              ? OffDayStrategyModel.restAndLeisure
+              : OffDayStrategyModel.accelerateWeek,
+          date: date,
+        );
+        await _datasource.addDeviation(deviation);
+      }
+    } else {
+      // Restore attending — remove the college cancellation deviations.
+      for (final dev in existing.toList()) {
+        await _datasource.removeDeviation(dev.id);
+      }
+    }
+  }
+
+  /// Checks if two nullable DateTimes represent the same calendar date.
+  static bool _isSameDate(DateTime? a, DateTime? b) {
+    if (a == null || b == null) {
+      // If stored deviation has no date, match by dayOfWeek only.
+      return a == null && b == null;
+    }
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   @override

@@ -9,6 +9,18 @@ enum DeviationTypeModel {
 
   @HiveField(1)
   extension,
+
+  @HiveField(2)
+  collegeCancellation,
+}
+
+@HiveType(typeId: 6)
+enum OffDayStrategyModel {
+  @HiveField(0)
+  accelerateWeek,
+
+  @HiveField(1)
+  restAndLeisure,
 }
 
 @HiveType(typeId: 2)
@@ -37,6 +49,12 @@ class ScheduleDeviationModel extends HiveObject {
   @HiveField(7)
   int? extensionMinutes;
 
+  @HiveField(8)
+  OffDayStrategyModel? offDayStrategyModel;
+
+  @HiveField(9)
+  DateTime? date;
+
   ScheduleDeviationModel();
 
   ScheduleDeviationModel.create({
@@ -48,5 +66,7 @@ class ScheduleDeviationModel extends HiveObject {
     required this.endMinutes,
     this.extendsBlockId,
     this.extensionMinutes,
+    this.offDayStrategyModel,
+    this.date,
   });
 }

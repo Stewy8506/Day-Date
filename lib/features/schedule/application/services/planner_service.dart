@@ -8,6 +8,8 @@
 /// 5. Return full weekly schedule with allocation warnings.
 library;
 
+import 'dart:math';
+
 import 'package:day_date/core/constants/schedule_constants.dart';
 import 'package:day_date/core/utils/time_utils.dart';
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
@@ -106,12 +108,49 @@ class PlannerService {
       allOccupied[day] = [];
     }
 
-    // Add fixed blocks.
+    // Identify college-off days from collegeCancellation deviations.
+    final collegeOffDays = <int, OffDayStrategy>{};
+    for (final dev in deviations) {
+      if (dev.type == DeviationType.collegeCancellation) {
+        collegeOffDays[dev.dayOfWeek] =
+            dev.offDayStrategy ?? OffDayStrategy.accelerateWeek;
+      }
+    }
+
+    // Add fixed blocks — skip College+Commute on college-off days.
     for (final block in fixedBlocks) {
+      if (collegeOffDays.containsKey(block.dayOfWeek) &&
+          (block.label == 'College' || block.label == 'Commute')) {
+        continue; // College cancelled — don't add to occupied map.
+      }
       allOccupied[block.dayOfWeek]!.add(block);
     }
 
-    // Apply deviations.
+    // For restAndLeisure days, insert a "Free Time" block spanning
+    // the college+commute range to prevent floating allocation.
+    for (final entry in collegeOffDays.entries) {
+      if (entry.value == OffDayStrategy.restAndLeisure) {
+        final dayCollegeBlocks = fixedBlocks.where((b) =>
+            b.dayOfWeek == entry.key &&
+            (b.label == 'College' || b.label == 'Commute'));
+        if (dayCollegeBlocks.isNotEmpty) {
+          final earliest =
+              dayCollegeBlocks.map((b) => b.startMinutes).reduce(min);
+          final latest =
+              dayCollegeBlocks.map((b) => b.endMinutes).reduce(max);
+          allOccupied[entry.key]!.add(TimeBlock(
+            id: 'free-time-${entry.key}',
+            label: 'Free Time',
+            dayOfWeek: entry.key,
+            startMinutes: earliest,
+            endMinutes: latest,
+            type: TimeBlockType.deviation,
+          ));
+        }
+      }
+    }
+
+    // Apply remaining deviations (blockout + extension).
     for (final dev in deviations) {
       if (dev.type == DeviationType.blockout) {
         // Add blockout as an occupied range.
@@ -152,6 +191,7 @@ class PlannerService {
           }
         }
       }
+      // collegeCancellation deviations are already handled above.
     }
 
     // Sort each day's occupied blocks by start time.
