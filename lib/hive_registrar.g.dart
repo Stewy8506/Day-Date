@@ -4,6 +4,7 @@
 
 import 'package:hive_ce/hive.dart';
 import 'package:day_date/features/schedule/data/models/schedule_deviation_model.dart';
+import 'package:day_date/features/schedule/data/models/task_completion_model.dart';
 import 'package:day_date/features/schedule/data/models/task_target_model.dart';
 import 'package:day_date/features/schedule/data/models/time_block_model.dart';
 
@@ -12,6 +13,7 @@ extension HiveRegistrar on HiveInterface {
     registerAdapter(DeviationTypeModelAdapter());
     registerAdapter(OffDayStrategyModelAdapter());
     registerAdapter(ScheduleDeviationModelAdapter());
+    registerAdapter(TaskCompletionModelAdapter());
     registerAdapter(TaskTargetModelAdapter());
     registerAdapter(TimeAffinityModelAdapter());
     registerAdapter(TimeBlockModelAdapter());
@@ -24,6 +26,7 @@ extension IsolatedHiveRegistrar on IsolatedHiveInterface {
     registerAdapter(DeviationTypeModelAdapter());
     registerAdapter(OffDayStrategyModelAdapter());
     registerAdapter(ScheduleDeviationModelAdapter());
+    registerAdapter(TaskCompletionModelAdapter());
     registerAdapter(TaskTargetModelAdapter());
     registerAdapter(TimeAffinityModelAdapter());
     registerAdapter(TimeBlockModelAdapter());

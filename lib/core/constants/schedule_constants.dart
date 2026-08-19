@@ -46,4 +46,5 @@ const Map<int, String> kDayNames = {
 const String kFixedBlocksBox = 'fixedBlocks';
 const String kTaskTargetsBox = 'taskTargets';
 const String kDeviationsBox = 'deviations';
+const String kTaskCompletionsBox = 'taskCompletions';
 const String kMetaBox = 'meta';

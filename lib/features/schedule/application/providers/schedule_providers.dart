@@ -7,12 +7,15 @@ library;
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:day_date/features/schedule/application/services/planner_service.dart';
 import 'package:day_date/features/schedule/data/datasources/local_schedule_datasource.dart';
 import 'package:day_date/features/schedule/data/repositories/schedule_repository_impl.dart';
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
+import 'package:day_date/features/schedule/domain/entities/task_completion.dart';
 import 'package:day_date/features/schedule/domain/entities/task_target.dart';
+import 'package:day_date/features/schedule/domain/entities/time_block.dart';
 import 'package:day_date/features/schedule/domain/repositories/schedule_repository.dart';
 
 // ── Infrastructure providers ────────────────────────────
@@ -165,6 +168,104 @@ final removeTaskTargetProvider = Provider<Future<void> Function(String)>(
     return (id) => repo.removeTaskTarget(id);
   },
 );
+
+/// Provides the active task completions list as a reactive stream.
+final rawTaskCompletionsProvider = StreamProvider<List<TaskCompletion>>((ref) {
+  final repo = ref.watch(scheduleRepositoryProvider);
+  final controller = StreamController<List<TaskCompletion>>();
+
+  Future<void> fetch() async {
+    final list = await repo.getTaskCompletions();
+    controller.add(list);
+  }
+
+  fetch();
+  final sub = repo.watchAllChanges().listen((_) => fetch());
+
+  ref.onDispose(() {
+    sub.cancel();
+    controller.close();
+  });
+
+  return controller.stream;
+});
+
+/// Provider for toggling task completion status ("Done / Not Done").
+final toggleTaskCompletionProvider = Provider<
+    Future<void> Function({
+      required TimeBlock block,
+      required int dayOfWeek,
+      String? dateString,
+      bool? forceStatus,
+      int? actualMinutes,
+    })>((ref) {
+  final repo = ref.watch(scheduleRepositoryProvider);
+  return ({
+    required block,
+    required dayOfWeek,
+    dateString,
+    forceStatus,
+    actualMinutes,
+  }) async {
+    final date = dateString ?? DateTime.now().toIso8601String().split('T').first;
+    final completions = await repo.getTaskCompletions();
+    final matches = completions.where((c) => c.blockId == block.id && c.dateString == date);
+    final existing = matches.isNotEmpty ? matches.first : null;
+
+    final newStatus = forceStatus ?? !(existing?.isCompleted ?? false);
+    final duration = actualMinutes ?? existing?.actualMinutes ?? block.durationMinutes;
+
+    final completion = TaskCompletion(
+      id: existing?.id ?? const Uuid().v4(),
+      blockId: block.id,
+      targetId: block.parentTargetId,
+      dayOfWeek: dayOfWeek,
+      dateString: date,
+      isCompleted: newStatus,
+      scheduledMinutes: block.durationMinutes,
+      actualMinutes: duration,
+      updatedAt: DateTime.now(),
+    );
+
+    await repo.setTaskCompletion(completion);
+  };
+});
+
+/// Provider for updating completion logged duration (e.g., when extending a task).
+final updateCompletionDurationProvider = Provider<
+    Future<void> Function({
+      required TimeBlock block,
+      required int dayOfWeek,
+      required int actualMinutes,
+      String? dateString,
+    })>((ref) {
+  final repo = ref.watch(scheduleRepositoryProvider);
+  return ({
+    required block,
+    required dayOfWeek,
+    required actualMinutes,
+    dateString,
+  }) async {
+    final date = dateString ?? DateTime.now().toIso8601String().split('T').first;
+    final completions = await repo.getTaskCompletions();
+    final matches = completions.where((c) => c.blockId == block.id && c.dateString == date);
+    final existing = matches.isNotEmpty ? matches.first : null;
+
+    final completion = TaskCompletion(
+      id: existing?.id ?? const Uuid().v4(),
+      blockId: block.id,
+      targetId: block.parentTargetId,
+      dayOfWeek: dayOfWeek,
+      dateString: date,
+      isCompleted: existing?.isCompleted ?? true,
+      scheduledMinutes: block.durationMinutes,
+      actualMinutes: actualMinutes,
+      updatedAt: DateTime.now(),
+    );
+
+    await repo.setTaskCompletion(completion);
+  };
+});
 
 /// Provider for toggling college attendance on a specific date.
 final setCollegeStatusProvider = Provider<

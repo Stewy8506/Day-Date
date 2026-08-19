@@ -8,6 +8,7 @@ import 'package:day_date/features/schedule/data/models/schedule_deviation_model.
 import 'package:day_date/features/schedule/data/models/task_target_model.dart';
 import 'package:day_date/features/schedule/data/models/time_block_model.dart';
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
+import 'package:day_date/features/schedule/domain/entities/task_completion.dart';
 import 'package:day_date/features/schedule/domain/entities/task_target.dart';
 import 'package:day_date/features/schedule/domain/entities/time_block.dart';
 import 'package:day_date/features/schedule/domain/repositories/schedule_repository.dart';
@@ -29,6 +30,18 @@ class ScheduleRepositoryImpl implements ScheduleRepository {
   @override
   Future<List<ScheduleDeviation>> getDeviations() async =>
       _datasource.getDeviations().map((m) => m.toEntity()).toList();
+
+  @override
+  Future<List<TaskCompletion>> getTaskCompletions() async =>
+      _datasource.getTaskCompletions().map((m) => m.toEntity()).toList();
+
+  @override
+  Future<void> setTaskCompletion(TaskCompletion completion) async =>
+      _datasource.saveTaskCompletion(completion.toModel());
+
+  @override
+  Future<void> removeTaskCompletion(String id) async =>
+      _datasource.removeTaskCompletion(id);
 
   @override
   Future<void> addDeviation(ScheduleDeviation deviation) async =>

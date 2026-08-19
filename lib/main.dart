@@ -12,6 +12,7 @@ import 'package:day_date/core/constants/schedule_constants.dart';
 import 'package:day_date/core/theme/app_theme.dart';
 import 'package:day_date/features/schedule/data/datasources/local_schedule_datasource.dart';
 import 'package:day_date/features/schedule/data/models/schedule_deviation_model.dart';
+import 'package:day_date/features/schedule/data/models/task_completion_model.dart';
 import 'package:day_date/features/schedule/data/models/task_target_model.dart';
 import 'package:day_date/features/schedule/data/models/time_block_model.dart';
 import 'package:day_date/features/schedule/data/repositories/schedule_repository_impl.dart';
@@ -32,6 +33,7 @@ void main() async {
     Hive.openBox<TimeBlockModel>(kFixedBlocksBox),
     Hive.openBox<TaskTargetModel>(kTaskTargetsBox),
     Hive.openBox<ScheduleDeviationModel>(kDeviationsBox),
+    Hive.openBox<TaskCompletionModel>(kTaskCompletionsBox),
     Hive.openBox(kMetaBox),
   ]);
 

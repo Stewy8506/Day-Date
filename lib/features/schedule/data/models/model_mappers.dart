@@ -2,9 +2,11 @@
 library;
 
 import 'package:day_date/features/schedule/data/models/schedule_deviation_model.dart';
+import 'package:day_date/features/schedule/data/models/task_completion_model.dart';
 import 'package:day_date/features/schedule/data/models/task_target_model.dart';
 import 'package:day_date/features/schedule/data/models/time_block_model.dart';
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
+import 'package:day_date/features/schedule/domain/entities/task_completion.dart';
 import 'package:day_date/features/schedule/domain/entities/task_target.dart';
 import 'package:day_date/features/schedule/domain/entities/time_block.dart';
 
@@ -184,5 +186,37 @@ extension ScheduleDeviationEntityMapper on ScheduleDeviation {
         return OffDayStrategyModel.restAndLeisure;
     }
   }
+}
+
+// ──────────────────────────────────────────────────────────
+// TaskCompletion mappings
+// ──────────────────────────────────────────────────────────
+
+extension TaskCompletionModelMapper on TaskCompletionModel {
+  TaskCompletion toEntity() => TaskCompletion(
+        id: id,
+        blockId: blockId,
+        targetId: targetId,
+        dayOfWeek: dayOfWeek,
+        dateString: dateString,
+        isCompleted: isCompleted,
+        scheduledMinutes: scheduledMinutes,
+        actualMinutes: actualMinutes,
+        updatedAt: updatedAt,
+      );
+}
+
+extension TaskCompletionEntityMapper on TaskCompletion {
+  TaskCompletionModel toModel() => TaskCompletionModel.create(
+        id: id,
+        blockId: blockId,
+        targetId: targetId,
+        dayOfWeek: dayOfWeek,
+        dateString: dateString,
+        isCompleted: isCompleted,
+        scheduledMinutes: scheduledMinutes,
+        actualMinutes: actualMinutes,
+        updatedAt: updatedAt,
+      );
 }
 

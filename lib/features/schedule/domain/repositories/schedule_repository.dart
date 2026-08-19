@@ -5,6 +5,7 @@
 library;
 
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
+import 'package:day_date/features/schedule/domain/entities/task_completion.dart';
 import 'package:day_date/features/schedule/domain/entities/task_target.dart';
 import 'package:day_date/features/schedule/domain/entities/time_block.dart';
 
@@ -17,6 +18,15 @@ abstract class ScheduleRepository {
 
   /// Returns all active schedule deviations.
   Future<List<ScheduleDeviation>> getDeviations();
+
+  /// Returns all task completion logs.
+  Future<List<TaskCompletion>> getTaskCompletions();
+
+  /// Persists or updates a task completion record.
+  Future<void> setTaskCompletion(TaskCompletion completion);
+
+  /// Removes a task completion record by ID.
+  Future<void> removeTaskCompletion(String id);
 
   /// Persists a new deviation.
   Future<void> addDeviation(ScheduleDeviation deviation);

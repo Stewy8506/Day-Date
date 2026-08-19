@@ -155,7 +155,11 @@ class TargetsDashboardPage extends ConsumerWidget {
                         itemCount: targets.length,
                         itemBuilder: (context, index) {
                           final target = targets[index];
-                          final allocated = result.allocatedHours[target.id] ?? 0.0;
+                          final completions = ref.watch(rawTaskCompletionsProvider).value ?? [];
+                          final extraOvertimeMinutes = completions
+                              .where((c) => c.targetId == target.id && c.actualMinutes > c.scheduledMinutes)
+                              .fold(0, (sum, c) => sum + (c.actualMinutes - c.scheduledMinutes));
+                          final allocated = (result.allocatedHours[target.id] ?? 0.0) + (extraOvertimeMinutes / 60.0);
                           final percent = target.weeklyHours > 0
                               ? (allocated / target.weeklyHours).clamp(0.0, 1.0)
                               : 0.0;

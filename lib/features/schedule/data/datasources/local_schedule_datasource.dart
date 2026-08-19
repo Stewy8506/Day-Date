@@ -7,6 +7,7 @@ import 'package:hive_ce/hive.dart';
 
 import 'package:day_date/core/constants/schedule_constants.dart';
 import 'package:day_date/features/schedule/data/models/schedule_deviation_model.dart';
+import 'package:day_date/features/schedule/data/models/task_completion_model.dart';
 import 'package:day_date/features/schedule/data/models/task_target_model.dart';
 import 'package:day_date/features/schedule/data/models/time_block_model.dart';
 
@@ -20,6 +21,9 @@ class LocalScheduleDatasource {
   Box<ScheduleDeviationModel> get _deviationsBox =>
       Hive.box<ScheduleDeviationModel>(kDeviationsBox);
 
+  Box<TaskCompletionModel> get _taskCompletionsBox =>
+      Hive.box<TaskCompletionModel>(kTaskCompletionsBox);
+
   Box get _metaBox => Hive.box(kMetaBox);
 
   // ── Reads ──────────────────────────────────────────────
@@ -32,6 +36,9 @@ class LocalScheduleDatasource {
 
   List<ScheduleDeviationModel> getDeviations() =>
       _deviationsBox.values.toList();
+
+  List<TaskCompletionModel> getTaskCompletions() =>
+      _taskCompletionsBox.values.toList();
 
   // ── Writes ─────────────────────────────────────────────
 
@@ -49,6 +56,12 @@ class LocalScheduleDatasource {
 
   Future<void> removeTaskTarget(String id) =>
       _taskTargetsBox.delete(id);
+
+  Future<void> saveTaskCompletion(TaskCompletionModel completion) =>
+      _taskCompletionsBox.put(completion.id, completion);
+
+  Future<void> removeTaskCompletion(String id) =>
+      _taskCompletionsBox.delete(id);
 
   // ── Seed ───────────────────────────────────────────────
 
@@ -71,18 +84,20 @@ class LocalScheduleDatasource {
 
   // ── Watch ──────────────────────────────────────────────
 
-  /// Emits whenever any of the three data boxes changes.
+  /// Emits whenever any of the data boxes changes.
   Stream<void> watchAllChanges() {
     final controller = StreamController<void>.broadcast();
 
     final sub1 = _fixedBlocksBox.watch().listen((_) => controller.add(null));
     final sub2 = _taskTargetsBox.watch().listen((_) => controller.add(null));
     final sub3 = _deviationsBox.watch().listen((_) => controller.add(null));
+    final sub4 = _taskCompletionsBox.watch().listen((_) => controller.add(null));
 
     controller.onCancel = () {
       sub1.cancel();
       sub2.cancel();
       sub3.cancel();
+      sub4.cancel();
     };
 
     return controller.stream;

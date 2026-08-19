@@ -13,8 +13,8 @@ import 'package:day_date/features/schedule/application/providers/schedule_provid
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
 import 'package:day_date/features/schedule/presentation/widgets/add_deviation_sheet.dart';
 import 'package:day_date/features/schedule/presentation/widgets/day_column.dart';
+import 'package:day_date/features/schedule/presentation/widgets/hourly_timeline_view.dart';
 import 'package:day_date/features/schedule/presentation/widgets/tactile_interactive.dart';
-import 'package:day_date/features/schedule/presentation/widgets/time_block_card.dart';
 
 class DailySchedulePage extends ConsumerWidget {
   const DailySchedulePage({super.key});
@@ -214,49 +214,12 @@ class DailySchedulePage extends ConsumerWidget {
                   ),
                 ),
 
-                // ── 4. Chronological Full-Bleed Timeline ─────
+                // ── 4. Hourly Continuous Timeline ───────────
                 Expanded(
-                  child: dayBlocks.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppColors.surface,
-                                  border: Border.all(color: AppColors.surfaceBorder),
-                                ),
-                                child: const Icon(
-                                  Icons.event_available_rounded,
-                                  size: 32,
-                                  color: AppColors.textTertiary,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'No Blocks Scheduled',
-                                style: AppTypography.cardTitle(color: AppColors.textSecondary),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                'Open leisure time for rest and relaxation.',
-                                style: AppTypography.caption(color: AppColors.textTertiary),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.only(top: 4, bottom: 40),
-                          itemCount: dayBlocks.length,
-                          itemBuilder: (context, index) => TimeBlockCard(
-                            block: dayBlocks[index],
-                            isFirst: index == 0,
-                            isLast: index == dayBlocks.length - 1,
-                          ),
-                        ),
+                  child: HourlyTimelineView(
+                    dayOfWeek: selectedDay,
+                    blocks: dayBlocks,
+                  ),
                 ),
               ],
             );
