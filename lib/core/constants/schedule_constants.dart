@@ -2,7 +2,7 @@
 library;
 
 /// Minimum duration (in minutes) for a floating target block.
-const int kMinBlockMinutes = 90;
+const int kMinBlockMinutes = 60;
 
 /// Day boundaries (minutes since midnight).
 const int kWeekdayStartMinutes = 450; // 07:30 AM (Monday - Friday)

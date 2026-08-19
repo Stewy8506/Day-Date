@@ -169,7 +169,7 @@ void main() {
       }
     });
 
-    test('all floating blocks are at least 90 minutes', () {
+    test('all floating blocks are at least minimum duration (kMinBlockMinutes)', () {
       final result = planner.computeWeeklySchedule(
         fixedBlocks: fixedBlocks,
         deviations: [],
@@ -283,6 +283,33 @@ void main() {
             b.endMinutes == fixed.endMinutes);
         expect(found, isTrue,
             reason: 'Fixed block ${fixed.label} (${fixed.id}) not found on day ${fixed.dayOfWeek}');
+      }
+    });
+
+    test('at most ONE focus activity scheduled in the morning before college departure', () {
+      final result = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targets,
+      );
+
+      for (int day = kMonday; day <= kFriday; day++) {
+        final dayBlocks = result.dailySchedule[day]!;
+        final collegeBlock = dayBlocks.firstWhere(
+          (b) => b.type == TimeBlockType.fixed && b.label.toLowerCase().contains('college'),
+          orElse: () => dayBlocks.first,
+        );
+
+        final preCollegeFloating = dayBlocks.where(
+          (b) => b.type == TimeBlockType.floating && b.startMinutes < collegeBlock.startMinutes,
+        ).toList();
+
+        expect(
+          preCollegeFloating.length,
+          lessThanOrEqualTo(1),
+          reason: 'Day $day has ${preCollegeFloating.length} focus sessions before college: '
+              '${preCollegeFloating.map((b) => b.label).toList()}',
+        );
       }
     });
 
@@ -763,7 +790,7 @@ void main() {
               'when Tuesday quotas were fulfilled early');
     });
 
-    test('all floating blocks maintain 90-minute minimum', () {
+    test('all floating blocks maintain minimum duration (kMinBlockMinutes)', () {
       final deviation = ScheduleDeviation(
         id: 'college-off-tue',
         label: 'College Off',
@@ -998,6 +1025,149 @@ void main() {
           reason: 'Day $day block count should match baseline after restore',
         );
       }
+    });
+
+    test('CAT prep flexible vs morning affinity 46h allocation', () {
+      final targetsMorning = [
+        const TaskTarget(
+          id: 'swe',
+          name: 'SWE Roadmap',
+          weeklyHours: 17.0,
+          priority: 1,
+          affinity: TimeAffinity.afternoon,
+          dailyCapHours: 3.5,
+        ),
+        const TaskTarget(
+          id: 'cat',
+          name: 'CAT Prep',
+          weeklyHours: 11.5,
+          priority: 2,
+          affinity: TimeAffinity.morning,
+          dailyCapHours: 3.0,
+        ),
+        const TaskTarget(
+          id: 'freelancing',
+          name: 'Freelancing',
+          weeklyHours: 10.0,
+          priority: 3,
+          affinity: TimeAffinity.lateNight,
+          dailyCapHours: 2.0,
+        ),
+        const TaskTarget(
+          id: 'ece',
+          name: 'ECE Upkeep',
+          weeklyHours: 7.5,
+          priority: 4,
+          affinity: TimeAffinity.flexible,
+          dailyCapHours: 2.0,
+        ),
+      ];
+
+      final targetsFlexible = [
+        const TaskTarget(
+          id: 'swe',
+          name: 'SWE Roadmap',
+          weeklyHours: 17.0,
+          priority: 1,
+          affinity: TimeAffinity.afternoon,
+          dailyCapHours: 3.0,
+        ),
+        const TaskTarget(
+          id: 'cat',
+          name: 'CAT Prep',
+          weeklyHours: 11.5,
+          priority: 2,
+          affinity: TimeAffinity.flexible,
+          dailyCapHours: 2.5,
+        ),
+        const TaskTarget(
+          id: 'freelancing',
+          name: 'Freelancing',
+          weeklyHours: 10.0,
+          priority: 3,
+          affinity: TimeAffinity.lateNight,
+          dailyCapHours: 2.0,
+        ),
+        const TaskTarget(
+          id: 'ece',
+          name: 'ECE Upkeep',
+          weeklyHours: 7.5,
+          priority: 4,
+          affinity: TimeAffinity.flexible,
+          dailyCapHours: 1.5,
+        ),
+      ];
+
+      final targetsAfternoon = [
+        const TaskTarget(
+          id: 'swe',
+          name: 'SWE Roadmap',
+          weeklyHours: 17.0,
+          priority: 1,
+          affinity: TimeAffinity.afternoon,
+          dailyCapHours: 3.0,
+        ),
+        const TaskTarget(
+          id: 'cat',
+          name: 'CAT Prep',
+          weeklyHours: 11.5,
+          priority: 2,
+          affinity: TimeAffinity.afternoon,
+          dailyCapHours: 2.5,
+        ),
+        const TaskTarget(
+          id: 'freelancing',
+          name: 'Freelancing',
+          weeklyHours: 10.0,
+          priority: 3,
+          affinity: TimeAffinity.lateNight,
+          dailyCapHours: 2.0,
+        ),
+        const TaskTarget(
+          id: 'ece',
+          name: 'ECE Upkeep',
+          weeklyHours: 7.5,
+          priority: 4,
+          affinity: TimeAffinity.flexible,
+          dailyCapHours: 1.5,
+        ),
+      ];
+
+      final resMorning = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targetsMorning,
+      );
+
+      final resFlexible = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targetsFlexible,
+      );
+
+      final resAfternoon = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targetsAfternoon,
+      );
+
+      expect(resMorning.allocatedHours['cat'], equals(11.5));
+      expect(resMorning.allocatedHours['swe'], equals(17.0));
+      expect(resMorning.allocatedHours['freelancing'], equals(10.0));
+      expect(resMorning.allocatedHours['ece'], equals(7.5));
+      expect(resMorning.warnings, isEmpty);
+
+      expect(resFlexible.allocatedHours['cat'], equals(11.5));
+      expect(resFlexible.allocatedHours['swe'], equals(17.0));
+      expect(resFlexible.allocatedHours['freelancing'], equals(10.0));
+      expect(resFlexible.allocatedHours['ece'], equals(7.5));
+      expect(resFlexible.warnings, isEmpty);
+
+      expect(resAfternoon.allocatedHours['cat'], equals(11.5));
+      expect(resAfternoon.allocatedHours['swe'], equals(17.0));
+      expect(resAfternoon.allocatedHours['freelancing'], equals(10.0));
+      expect(resAfternoon.allocatedHours['ece'], equals(7.5));
+      expect(resAfternoon.warnings, isEmpty);
     });
   });
 }

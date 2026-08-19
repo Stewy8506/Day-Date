@@ -16,7 +16,6 @@ import 'package:day_date/features/schedule/application/providers/schedule_provid
 import 'package:day_date/features/schedule/domain/entities/task_completion.dart';
 import 'package:day_date/features/schedule/domain/entities/time_block.dart';
 import 'package:day_date/features/schedule/presentation/widgets/block_action_sheet.dart';
-import 'package:day_date/features/schedule/presentation/widgets/tactile_interactive.dart';
 
 class HourlyTimelineView extends ConsumerStatefulWidget {
   final int dayOfWeek;
@@ -222,11 +221,16 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
             // ── 4. Proportional Event Blocks ────────────
             ...sortedBlocks.map((block) {
               final top = (block.startMinutes - (startHour * 60)) * kPixelsPerMinute;
-              final height = max(42.0, (block.durationMinutes * kPixelsPerMinute) - 4);
+              final height = max(48.0, (block.durationMinutes * kPixelsPerMinute) - 4);
 
               // Find completion record if any
               final completion = completions.cast<TaskCompletion?>().firstWhere(
-                    (c) => c?.blockId == block.id && c?.dayOfWeek == widget.dayOfWeek,
+                    (c) => c != null &&
+                        (c.blockId == block.id ||
+                            (block.parentTargetId != null &&
+                                c.targetId == block.parentTargetId &&
+                                c.dayOfWeek == widget.dayOfWeek)) &&
+                        c.dayOfWeek == widget.dayOfWeek,
                     orElse: () => null,
                   );
 
@@ -239,66 +243,68 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
                 left: kTimeColumnWidth + 8,
                 right: 16,
                 height: height,
-                child: Tactile(
-                  onTap: () {
-                    BlockActionSheet.show(
-                      context,
-                      block: block,
-                      dayOfWeek: widget.dayOfWeek,
-                      completion: completion,
-                    );
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isCompleted
+                        ? AppColors.surfaceElevated.withValues(alpha: 0.6)
+                        : AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
                       color: isCompleted
-                          ? AppColors.surfaceElevated.withValues(alpha: 0.6)
-                          : AppColors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isCompleted
-                            ? AppColors.accentSage.withValues(alpha: 0.4)
-                            : isFocus
-                                ? AppColors.accentWarm.withValues(alpha: 0.25)
-                                : AppColors.surfaceBorder,
-                        width: 1.0,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.25),
-                          blurRadius: 5,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                          ? AppColors.accentSage.withValues(alpha: 0.4)
+                          : isFocus
+                              ? AppColors.accentWarm.withValues(alpha: 0.25)
+                              : AppColors.surfaceBorder,
+                      width: 1.0,
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // Left Category Accent Node
-                            Container(
-                              width: 3.5,
-                              height: max(24, height - 20),
-                              decoration: BoxDecoration(
-                                color: isCompleted
-                                    ? AppColors.accentSage
-                                    : isFocus
-                                        ? AppColors.accentWarm
-                                        : isGym
-                                            ? AppColors.accentSage
-                                            : AppColors.accentTerracotta,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Left Category Accent Node
+                          Container(
+                            width: 3.5,
+                            height: max(20, height - 16),
+                            decoration: BoxDecoration(
+                              color: isCompleted
+                                  ? AppColors.accentSage
+                                  : isFocus
+                                      ? AppColors.accentWarm
+                                      : isGym
+                                          ? AppColors.accentSage
+                                          : AppColors.accentTerracotta,
+                              borderRadius: BorderRadius.circular(2),
                             ),
-                            const SizedBox(width: 10),
+                          ),
+                          const SizedBox(width: 10),
 
-                            // Main Content Area
-                            Expanded(
+                          // Main Content Area (Tapping opens action sheet)
+                          Expanded(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                BlockActionSheet.show(
+                                  context,
+                                  block: block,
+                                  dayOfWeek: widget.dayOfWeek,
+                                  completion: completion,
+                                );
+                              },
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   // Category Eyebrow Tag
                                   Row(
@@ -315,7 +321,7 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
                                               : isFocus
                                                   ? AppColors.accentWarm
                                                   : AppColors.textTertiary,
-                                        ).copyWith(fontSize: 8.5),
+                                        ).copyWith(fontSize: 8.0, height: 1.1),
                                       ),
                                       if (isCompleted) ...[
                                         const SizedBox(width: 5),
@@ -328,7 +334,7 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
                                           child: Text(
                                             'DONE',
                                             style: AppTypography.overline(color: AppColors.accentSage)
-                                                .copyWith(fontSize: 8),
+                                                .copyWith(fontSize: 7.5, height: 1.1),
                                           ),
                                         ),
                                       ],
@@ -342,7 +348,8 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
                                     style: AppTypography.cardTitle(
                                       color: isCompleted ? AppColors.textSecondary : AppColors.textPrimary,
                                     ).copyWith(
-                                      fontSize: 13.5,
+                                      fontSize: height < 60 ? 12.5 : 13.0,
+                                      height: 1.15,
                                       decoration: isCompleted ? TextDecoration.lineThrough : null,
                                       decorationColor: AppColors.accentSage,
                                     ),
@@ -356,34 +363,35 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
                                     '${formatMinutes(block.startMinutes)} – ${formatMinutes(block.endMinutes)} (${formatDuration(block.durationMinutes)})',
                                     style: AppTypography.monoTime(
                                       color: isCompleted ? AppColors.textDisabled : AppColors.textSecondary,
-                                    ).copyWith(fontSize: 10.5),
+                                    ).copyWith(fontSize: 9.5, height: 1.1),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
                             ),
+                          ),
 
-                            // Interactive Done Toggle Checkbox
-                            if (isFocus)
-                              Tactile(
-                                onTap: () {
-                                  ref.read(toggleTaskCompletionProvider)(
-                                    block: block,
-                                    dayOfWeek: widget.dayOfWeek,
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  child: Icon(
-                                    isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                                    size: 20,
-                                    color: isCompleted ? AppColors.accentSage : AppColors.textTertiary,
-                                  ),
+                          // Dedicated Interactive Done Toggle Checkbox
+                          if (isFocus)
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                ref.read(toggleTaskCompletionProvider)(
+                                  block: block,
+                                  dayOfWeek: widget.dayOfWeek,
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                child: Icon(
+                                  isCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                  size: 22,
+                                  color: isCompleted ? AppColors.accentSage : AppColors.textTertiary,
                                 ),
                               ),
-                          ],
-                        ),
+                            ),
+                        ],
                       ),
                     ),
                   ),

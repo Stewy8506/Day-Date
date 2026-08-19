@@ -12,6 +12,14 @@ import 'package:day_date/features/schedule/data/models/task_target_model.dart';
 import 'package:day_date/features/schedule/data/models/time_block_model.dart';
 
 class LocalScheduleDatasource {
+  final _changeController = StreamController<void>.broadcast();
+
+  void _notifyChanges() {
+    if (!_changeController.isClosed) {
+      _changeController.add(null);
+    }
+  }
+
   Box<TimeBlockModel> get _fixedBlocksBox =>
       Hive.box<TimeBlockModel>(kFixedBlocksBox);
 
@@ -21,10 +29,27 @@ class LocalScheduleDatasource {
   Box<ScheduleDeviationModel> get _deviationsBox =>
       Hive.box<ScheduleDeviationModel>(kDeviationsBox);
 
-  Box<TaskCompletionModel> get _taskCompletionsBox =>
-      Hive.box<TaskCompletionModel>(kTaskCompletionsBox);
-
   Box get _metaBox => Hive.box(kMetaBox);
+
+  Box<TaskCompletionModel>? get _maybeTaskCompletionsBox {
+    try {
+      if (Hive.isBoxOpen(kTaskCompletionsBox)) {
+        return Hive.box<TaskCompletionModel>(kTaskCompletionsBox);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<Box<TaskCompletionModel>> _ensureTaskCompletionsBox() async {
+    try {
+      if (Hive.isBoxOpen(kTaskCompletionsBox)) {
+        return Hive.box<TaskCompletionModel>(kTaskCompletionsBox);
+      }
+      return await Hive.openBox<TaskCompletionModel>(kTaskCompletionsBox);
+    } catch (_) {
+      return await Hive.openBox<TaskCompletionModel>(kTaskCompletionsBox);
+    }
+  }
 
   // ── Reads ──────────────────────────────────────────────
 
@@ -37,31 +62,50 @@ class LocalScheduleDatasource {
   List<ScheduleDeviationModel> getDeviations() =>
       _deviationsBox.values.toList();
 
-  List<TaskCompletionModel> getTaskCompletions() =>
-      _taskCompletionsBox.values.toList();
+  List<TaskCompletionModel> getTaskCompletions() {
+    final box = _maybeTaskCompletionsBox;
+    if (box == null) return [];
+    return box.values.toList();
+  }
 
   // ── Writes ─────────────────────────────────────────────
 
-  Future<void> addDeviation(ScheduleDeviationModel deviation) =>
-      _deviationsBox.put(deviation.id, deviation);
+  Future<void> addDeviation(ScheduleDeviationModel deviation) async {
+    await _deviationsBox.put(deviation.id, deviation);
+    _notifyChanges();
+  }
 
-  Future<void> removeDeviation(String id) =>
-      _deviationsBox.delete(id);
+  Future<void> removeDeviation(String id) async {
+    await _deviationsBox.delete(id);
+    _notifyChanges();
+  }
 
-  Future<void> addFixedBlock(TimeBlockModel block) =>
-      _fixedBlocksBox.put(block.id, block);
+  Future<void> addFixedBlock(TimeBlockModel block) async {
+    await _fixedBlocksBox.put(block.id, block);
+    _notifyChanges();
+  }
 
-  Future<void> addTaskTarget(TaskTargetModel target) =>
-      _taskTargetsBox.put(target.id, target);
+  Future<void> addTaskTarget(TaskTargetModel target) async {
+    await _taskTargetsBox.put(target.id, target);
+    _notifyChanges();
+  }
 
-  Future<void> removeTaskTarget(String id) =>
-      _taskTargetsBox.delete(id);
+  Future<void> removeTaskTarget(String id) async {
+    await _taskTargetsBox.delete(id);
+    _notifyChanges();
+  }
 
-  Future<void> saveTaskCompletion(TaskCompletionModel completion) =>
-      _taskCompletionsBox.put(completion.id, completion);
+  Future<void> saveTaskCompletion(TaskCompletionModel completion) async {
+    final box = await _ensureTaskCompletionsBox();
+    await box.put(completion.id, completion);
+    _notifyChanges();
+  }
 
-  Future<void> removeTaskCompletion(String id) =>
-      _taskCompletionsBox.delete(id);
+  Future<void> removeTaskCompletion(String id) async {
+    final box = await _ensureTaskCompletionsBox();
+    await box.delete(id);
+    _notifyChanges();
+  }
 
   // ── Seed ───────────────────────────────────────────────
 
@@ -88,16 +132,22 @@ class LocalScheduleDatasource {
   Stream<void> watchAllChanges() {
     final controller = StreamController<void>.broadcast();
 
+    final sub0 = _changeController.stream.listen((_) => controller.add(null));
     final sub1 = _fixedBlocksBox.watch().listen((_) => controller.add(null));
     final sub2 = _taskTargetsBox.watch().listen((_) => controller.add(null));
     final sub3 = _deviationsBox.watch().listen((_) => controller.add(null));
-    final sub4 = _taskCompletionsBox.watch().listen((_) => controller.add(null));
+    StreamSubscription? sub4;
+    final compBox = _maybeTaskCompletionsBox;
+    if (compBox != null) {
+      sub4 = compBox.watch().listen((_) => controller.add(null));
+    }
 
     controller.onCancel = () {
+      sub0.cancel();
       sub1.cancel();
       sub2.cancel();
       sub3.cancel();
-      sub4.cancel();
+      sub4?.cancel();
     };
 
     return controller.stream;

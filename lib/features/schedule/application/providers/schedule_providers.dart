@@ -207,9 +207,18 @@ final toggleTaskCompletionProvider = Provider<
     forceStatus,
     actualMinutes,
   }) async {
-    final date = dateString ?? DateTime.now().toIso8601String().split('T').first;
+    final now = DateTime.now();
+    final diff = dayOfWeek - now.weekday;
+    final targetDate = DateTime(now.year, now.month, now.day + diff);
+    final date = dateString ?? targetDate.toIso8601String().split('T').first;
+
     final completions = await repo.getTaskCompletions();
-    final matches = completions.where((c) => c.blockId == block.id && c.dateString == date);
+    final matches = completions.where((c) =>
+        (c.blockId == block.id ||
+            (block.parentTargetId != null &&
+                c.targetId == block.parentTargetId &&
+                c.dayOfWeek == dayOfWeek)) &&
+        c.dateString == date);
     final existing = matches.isNotEmpty ? matches.first : null;
 
     final newStatus = forceStatus ?? !(existing?.isCompleted ?? false);
@@ -246,9 +255,18 @@ final updateCompletionDurationProvider = Provider<
     required actualMinutes,
     dateString,
   }) async {
-    final date = dateString ?? DateTime.now().toIso8601String().split('T').first;
+    final now = DateTime.now();
+    final diff = dayOfWeek - now.weekday;
+    final targetDate = DateTime(now.year, now.month, now.day + diff);
+    final date = dateString ?? targetDate.toIso8601String().split('T').first;
+
     final completions = await repo.getTaskCompletions();
-    final matches = completions.where((c) => c.blockId == block.id && c.dateString == date);
+    final matches = completions.where((c) =>
+        (c.blockId == block.id ||
+            (block.parentTargetId != null &&
+                c.targetId == block.parentTargetId &&
+                c.dayOfWeek == dayOfWeek)) &&
+        c.dateString == date);
     final existing = matches.isNotEmpty ? matches.first : null;
 
     final completion = TaskCompletion(
