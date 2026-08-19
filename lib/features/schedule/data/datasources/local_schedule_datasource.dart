@@ -50,16 +50,18 @@ class LocalScheduleDatasource {
   // ── Seed ───────────────────────────────────────────────
 
   Future<bool> isSeeded() async =>
-      _metaBox.get('seeded', defaultValue: false) == true;
+      _metaBox.get('seeded_v3', defaultValue: false) == true;
 
-  Future<void> markSeeded() => _metaBox.put('seeded', true);
+  Future<void> markSeeded() => _metaBox.put('seeded_v3', true);
 
   Future<void> seedFixedBlocks(List<TimeBlockModel> blocks) async {
+    await _fixedBlocksBox.clear();
     final map = {for (final b in blocks) b.id: b};
     await _fixedBlocksBox.putAll(map);
   }
 
   Future<void> seedTaskTargets(List<TaskTargetModel> targets) async {
+    await _taskTargetsBox.clear();
     final map = {for (final t in targets) t.id: t};
     await _taskTargetsBox.putAll(map);
   }

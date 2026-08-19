@@ -10,6 +10,10 @@ const int kWeekendStartMinutes = 660; // 11:00 AM (Saturday - Sunday)
 const int kDayStartMinutes = 450; // default baseline (07:30 AM)
 const int kDayEndMinutes = 1439; // 23:59 PM
 
+/// Inter-session rest breaks between consecutive focus activities.
+const int kWeekendInterSessionBreakMinutes = 30; // 30-min break on weekends
+const int kWeekdayInterSessionBreakMinutes = 15; // 15-min break on weekdays
+
 /// Time affinity window boundaries (minutes since midnight).
 const int kMorningStart = 450; // 07:30 AM
 const int kMorningEnd = 720; // 12:00 PM

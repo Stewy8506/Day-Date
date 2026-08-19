@@ -47,7 +47,7 @@ class ScheduleRepositoryImpl implements ScheduleRepository {
 
     const uuid = Uuid();
 
-    // ── Fixed Blocks: College + Commute ──────────────────
+    // ── Fixed Blocks: College & Commute ──────────────────
 
     final fixedBlocks = <TimeBlockModel>[];
 
@@ -56,36 +56,12 @@ class ScheduleRepositoryImpl implements ScheduleRepository {
       required int collegeStart, // minutes since midnight
       required int collegeEnd,
     }) {
-      final collegeId = uuid.v4();
-      final commuteBeforeId = uuid.v4();
-      final commuteAfterId = uuid.v4();
-
-      // Commute before college (30 min)
+      // Unified College & Commute block (includes 30m prep commute + college + 40m return commute)
       fixedBlocks.add(TimeBlockModel.create(
-        id: commuteBeforeId,
-        label: 'Commute',
+        id: uuid.v4(),
+        label: 'College & Commute',
         dayOfWeek: day,
         startMinutes: collegeStart - 30,
-        endMinutes: collegeStart,
-        typeModel: TimeBlockTypeModel.fixed,
-      ));
-
-      // College block
-      fixedBlocks.add(TimeBlockModel.create(
-        id: collegeId,
-        label: 'College',
-        dayOfWeek: day,
-        startMinutes: collegeStart,
-        endMinutes: collegeEnd,
-        typeModel: TimeBlockTypeModel.fixed,
-      ));
-
-      // Commute after college (40 min)
-      fixedBlocks.add(TimeBlockModel.create(
-        id: commuteAfterId,
-        label: 'Commute',
-        dayOfWeek: day,
-        startMinutes: collegeEnd,
         endMinutes: collegeEnd + 40,
         typeModel: TimeBlockTypeModel.fixed,
       ));

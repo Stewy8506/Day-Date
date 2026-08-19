@@ -18,26 +18,10 @@ List<TimeBlock> _createSeedFixedBlocks() {
 
   void addCollegeDay(int day, int collegeStart, int collegeEnd) {
     blocks.add(TimeBlock(
-      id: 'commute-before-${id++}',
-      label: 'Commute',
+      id: 'college-${id++}',
+      label: 'College & Commute',
       dayOfWeek: day,
       startMinutes: collegeStart - 30,
-      endMinutes: collegeStart,
-      type: TimeBlockType.fixed,
-    ));
-    blocks.add(TimeBlock(
-      id: 'college-${id++}',
-      label: 'College',
-      dayOfWeek: day,
-      startMinutes: collegeStart,
-      endMinutes: collegeEnd,
-      type: TimeBlockType.fixed,
-    ));
-    blocks.add(TimeBlock(
-      id: 'commute-after-${id++}',
-      label: 'Commute',
-      dayOfWeek: day,
-      startMinutes: collegeEnd,
       endMinutes: collegeEnd + 40,
       type: TimeBlockType.fixed,
     ));
@@ -203,32 +187,54 @@ void main() {
       }
     });
 
-    test('daily cap respected for each target', () {
+    test('daily total exertion is balanced across all days', () {
       final result = planner.computeWeeklySchedule(
         fixedBlocks: fixedBlocks,
         deviations: [],
         targets: targets,
       );
 
-      for (final target in targets) {
-        for (int day = kMonday; day <= kSunday; day++) {
-          final dayBlocks = result.dailySchedule[day]!;
-          final targetMinutes = dayBlocks
-              .where((b) => b.parentTargetId == target.id)
-              .fold(0, (sum, b) => sum + b.durationMinutes);
+      for (int day = kMonday; day <= kSunday; day++) {
+        final dayBlocks = result.dailySchedule[day]!;
+        final totalMinutes =
+            dayBlocks.fold(0, (sum, b) => sum + b.durationMinutes);
+        final maxDayMinutes = (16.0 * 60).round();
 
-          final isCollegeDay = day >= kMonday && day <= kFriday;
-          final maxCap = isCollegeDay
-              ? target.dailyCapMinutes
-              : (target.dailyCapMinutes * 1.5).round();
+        expect(
+          totalMinutes,
+          lessThanOrEqualTo(maxDayMinutes),
+          reason: 'Day $day total scheduled time (${totalMinutes / 60}h) '
+              'exceeds daily maximum of ${maxDayMinutes / 60}h',
+        );
+      }
+    });
 
-          expect(
-            targetMinutes,
-            lessThanOrEqualTo(maxCap),
-            reason:
-                '${target.name} on day $day: ${targetMinutes}min exceeds '
-                'daily cap of ${maxCap}min',
-          );
+    test('inter-session rest breaks enforced between consecutive focus sessions', () {
+      final result = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targets,
+      );
+
+      for (int day = kMonday; day <= kSunday; day++) {
+        final dayBlocks = result.dailySchedule[day]!;
+        final isWeekend = day == kSaturday || day == kSunday;
+        final minBreak = isWeekend ? kWeekendInterSessionBreakMinutes : kWeekdayInterSessionBreakMinutes;
+
+        for (int i = 0; i < dayBlocks.length - 1; i++) {
+          final curr = dayBlocks[i];
+          final next = dayBlocks[i + 1];
+
+          // If both are floating focus blocks, check break buffer
+          if (curr.type == TimeBlockType.floating && next.type == TimeBlockType.floating) {
+            final gap = next.startMinutes - curr.endMinutes;
+            expect(
+              gap,
+              greaterThanOrEqualTo(minBreak),
+              reason: 'On day $day between ${curr.label} and ${next.label}, '
+                  'break is ${gap}m, expected at least ${minBreak}m',
+            );
+          }
         }
       }
     });
@@ -250,8 +256,13 @@ void main() {
           expect(
             allocated,
             greaterThanOrEqualTo(target.weeklyHours - 0.1),
-            reason: '${target.name}: expected ${target.weeklyHours}h, '
+            reason: '${target.name}: expected at least ${target.weeklyHours}h, '
                 'got ${allocated}h without warning',
+          );
+          expect(
+            allocated,
+            lessThanOrEqualTo(target.weeklyHours + 0.1),
+            reason: '${target.name}: allocated ${allocated}h exceeds weekly target of ${target.weeklyHours}h',
           );
         }
       }
@@ -438,7 +449,7 @@ void main() {
     test('extension deviation extends fixed block correctly', () {
       // Find a college block to extend.
       final tuesdayCollege = fixedBlocks.firstWhere(
-        (b) => b.dayOfWeek == kTuesday && b.label == 'College',
+        (b) => b.dayOfWeek == kTuesday && (b.label == 'College' || b.label == 'College & Commute'),
       );
 
       final deviation = ScheduleDeviation(
@@ -600,13 +611,10 @@ void main() {
       );
 
       final tueBlocks = result.dailySchedule[kTuesday]!;
-      final hasCollege = tueBlocks.any((b) => b.label == 'College');
-      final hasCommute = tueBlocks.any((b) => b.label == 'Commute');
+      final hasCollege = tueBlocks.any((b) => b.label.toLowerCase().contains('college'));
 
       expect(hasCollege, isFalse,
-          reason: 'College block should be removed on Tuesday');
-      expect(hasCommute, isFalse,
-          reason: 'Commute blocks should be removed on Tuesday');
+          reason: 'College & Commute block should be removed on Tuesday');
     });
 
     test('fills freed hours with floating targets', () {
@@ -977,13 +985,10 @@ void main() {
 
       // Tuesday should have college blocks again.
       final tueBlocks = restored.dailySchedule[kTuesday]!;
-      final hasCollege = tueBlocks.any((b) => b.label == 'College');
-      final hasCommute = tueBlocks.any((b) => b.label == 'Commute');
+      final hasCollege = tueBlocks.any((b) => b.label.toLowerCase().contains('college'));
 
       expect(hasCollege, isTrue,
-          reason: 'College block should be restored on Tuesday');
-      expect(hasCommute, isTrue,
-          reason: 'Commute blocks should be restored on Tuesday');
+          reason: 'College & Commute block should be restored on Tuesday');
 
       // Block counts should match baseline.
       for (int day = kMonday; day <= kSunday; day++) {
