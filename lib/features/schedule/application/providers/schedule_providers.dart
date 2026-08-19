@@ -1,0 +1,95 @@
+/// Riverpod providers for the schedule feature.
+///
+/// Exposes the computed daily schedule as a reactive stream that
+/// automatically rebuilds when the underlying Hive data changes.
+library;
+
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:day_date/features/schedule/application/services/planner_service.dart';
+import 'package:day_date/features/schedule/data/datasources/local_schedule_datasource.dart';
+import 'package:day_date/features/schedule/data/repositories/schedule_repository_impl.dart';
+import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
+import 'package:day_date/features/schedule/domain/repositories/schedule_repository.dart';
+
+// ── Infrastructure providers ────────────────────────────
+
+final localScheduleDatasourceProvider = Provider<LocalScheduleDatasource>(
+  (ref) => LocalScheduleDatasource(),
+);
+
+final scheduleRepositoryProvider = Provider<ScheduleRepository>(
+  (ref) => ScheduleRepositoryImpl(ref.watch(localScheduleDatasourceProvider)),
+);
+
+final plannerServiceProvider = Provider<PlannerService>(
+  (ref) => PlannerService(),
+);
+
+// ── Reactive schedule stream ────────────────────────────
+
+/// Provides the computed weekly schedule as a stream.
+/// Emits an initial value immediately, then re-emits whenever
+/// any data in Hive changes (deviations added/removed, etc.).
+final weeklyScheduleProvider = StreamProvider<ScheduleResult>((ref) {
+  final repo = ref.watch(scheduleRepositoryProvider);
+  final planner = ref.watch(plannerServiceProvider);
+
+  // Build the initial schedule + listen for changes.
+  final controller = StreamController<ScheduleResult>();
+
+  Future<void> recompute() async {
+    final blocks = await repo.getFixedBlocks();
+    final targets = await repo.getTaskTargets();
+    final deviations = await repo.getDeviations();
+
+    final result = planner.computeWeeklySchedule(
+      fixedBlocks: blocks,
+      deviations: deviations,
+      targets: targets,
+    );
+
+    controller.add(result);
+  }
+
+  // Emit initial schedule.
+  recompute();
+
+  // Watch for Hive box changes.
+  final subscription = repo.watchAllChanges().listen((_) => recompute());
+
+  ref.onDispose(() {
+    subscription.cancel();
+    controller.close();
+  });
+
+  return controller.stream;
+});
+
+// ── Selected day state ──────────────────────────────────
+
+/// Tracks which day is currently selected in the UI.
+final selectedDayProvider = StateProvider<int>(
+  (ref) => DateTime.now().weekday,
+);
+
+// ── Deviation actions ───────────────────────────────────
+
+/// Provider for adding a deviation — triggers schedule recomputation
+/// automatically via the Hive watch stream.
+final addDeviationProvider = Provider<Future<void> Function(ScheduleDeviation)>(
+  (ref) {
+    final repo = ref.watch(scheduleRepositoryProvider);
+    return (deviation) => repo.addDeviation(deviation);
+  },
+);
+
+/// Provider for removing a deviation.
+final removeDeviationProvider = Provider<Future<void> Function(String)>(
+  (ref) {
+    final repo = ref.watch(scheduleRepositoryProvider);
+    return (id) => repo.removeDeviation(id);
+  },
+);

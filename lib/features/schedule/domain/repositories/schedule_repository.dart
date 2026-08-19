@@ -1,0 +1,37 @@
+/// Abstract interface for schedule data operations.
+///
+/// The domain layer depends on this interface; the data layer provides
+/// the concrete implementation.
+library;
+
+import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
+import 'package:day_date/features/schedule/domain/entities/task_target.dart';
+import 'package:day_date/features/schedule/domain/entities/time_block.dart';
+
+abstract class ScheduleRepository {
+  /// Returns all baseline fixed blocks (college, gym, commute).
+  Future<List<TimeBlock>> getFixedBlocks();
+
+  /// Returns all floating task targets with their quotas.
+  Future<List<TaskTarget>> getTaskTargets();
+
+  /// Returns all active schedule deviations.
+  Future<List<ScheduleDeviation>> getDeviations();
+
+  /// Persists a new deviation.
+  Future<void> addDeviation(ScheduleDeviation deviation);
+
+  /// Removes a deviation by ID.
+  Future<void> removeDeviation(String id);
+
+  /// Seeds the database with initial fixed blocks and task targets
+  /// if the database is empty (first launch).
+  Future<void> seedIfEmpty();
+
+  /// Returns true if this is the first launch (no data seeded yet).
+  Future<bool> isFirstLaunch();
+
+  /// Watches for any data changes (deviations added/removed, etc.)
+  /// and emits a notification on each change.
+  Stream<void> watchAllChanges();
+}
