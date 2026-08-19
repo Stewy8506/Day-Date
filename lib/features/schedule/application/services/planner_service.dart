@@ -231,61 +231,103 @@ class PlannerService {
 
     final floatingBlocks = <TimeBlock>[];
 
-    // Multi-pass: repeat until no more progress can be made.
+    // Helper to attempt allocating a chunk to a specific target on a specific day
+    bool tryAllocate({
+      required TaskTarget target,
+      required int day,
+      required bool affinityOnly,
+      int? maxSessionMinutes,
+    }) {
+      final alloc = allocations[target.id]!;
+      if (alloc.isFilled) return false;
+      if (alloc.remainingForDay(day) <= 0) return false;
+
+      final slots = freeSlotsByDay[day]!;
+      if (slots.isEmpty) return false;
+
+      final affinitySlots = _getAffinitySlots(slots, target.affinity);
+      final candidateSlots = affinityOnly
+          ? affinitySlots
+          : [...affinitySlots, ...slots.where((s) => !affinitySlots.contains(s))];
+
+      for (final slot in candidateSlots) {
+        if (slot.duration < kMinBlockMinutes) continue;
+        if (alloc.isFilled) break;
+        if (alloc.remainingForDay(day) <= 0) break;
+
+        int needed = _calculateAllocation(
+          remaining: alloc.remainingMinutes,
+          dailyRemaining: alloc.remainingForDay(day),
+          slotDuration: slot.duration,
+          maxSessionMinutes: maxSessionMinutes,
+        );
+
+        if (needed < kMinBlockMinutes) continue;
+
+        // Create the floating block.
+        floatingBlocks.add(TimeBlock(
+          id: _uuid.v4(),
+          label: target.name,
+          dayOfWeek: day,
+          startMinutes: slot.startMinutes,
+          endMinutes: slot.startMinutes + needed,
+          type: TimeBlockType.floating,
+          parentTargetId: target.id,
+        ));
+
+        alloc.allocate(day, needed);
+        slot.startMinutes += needed;
+
+        // Remove slot if fully consumed or too small.
+        if (slot.duration < kMinBlockMinutes) {
+          freeSlotsByDay[day]!.remove(slot);
+        }
+        return true;
+      }
+      return false;
+    }
+
+    // ── Pass 1: Proportional Base Distribution across all 7 days ──
+    // Ensures Saturday and Sunday get their fair baseline share before early days consume everything.
+    for (final target in sortedTargets) {
+      final idealDaily = max(
+        kMinBlockMinutes,
+        min(target.dailyCapMinutes, (target.weeklyMinutes / 7).round()),
+      );
+
+      for (int day = kMonday; day <= kSunday; day++) {
+        final alloc = allocations[target.id]!;
+        if ((alloc.dailyAllocatedMinutes[day] ?? 0) > 0) continue;
+        tryAllocate(
+          target: target,
+          day: day,
+          affinityOnly: true,
+          maxSessionMinutes: idealDaily,
+        );
+      }
+    }
+
+    // ── Pass 2: Fill remaining quota in preferred Affinity Windows ──
     bool madeProgress = true;
     while (madeProgress) {
       madeProgress = false;
-
       for (int day = kMonday; day <= kSunday; day++) {
         for (final target in sortedTargets) {
-          final alloc = allocations[target.id]!;
-          if (alloc.isFilled) continue;
-          if (alloc.remainingForDay(day) <= 0) continue;
-
-          final slots = freeSlotsByDay[day]!;
-          if (slots.isEmpty) continue;
-
-          // Affinity pass: try preferred-window slots first.
-          final affinitySlots = _getAffinitySlots(slots, target.affinity);
-          final spilloverSlots = slots
-              .where((s) => !affinitySlots.contains(s))
-              .toList();
-
-          // Try affinity slots first, then spillover.
-          final orderedSlots = [...affinitySlots, ...spilloverSlots];
-
-          for (final slot in orderedSlots) {
-            if (slot.duration < kMinBlockMinutes) continue;
-            if (alloc.isFilled) break;
-            if (alloc.remainingForDay(day) <= 0) break;
-
-            int needed = _calculateAllocation(
-              remaining: alloc.remainingMinutes,
-              dailyRemaining: alloc.remainingForDay(day),
-              slotDuration: slot.duration,
-            );
-
-            if (needed <= 0) continue;
-
-            // Create the floating block.
-            floatingBlocks.add(TimeBlock(
-              id: _uuid.v4(),
-              label: target.name,
-              dayOfWeek: day,
-              startMinutes: slot.startMinutes,
-              endMinutes: slot.startMinutes + needed,
-              type: TimeBlockType.floating,
-              parentTargetId: target.id,
-            ));
-
-            alloc.allocate(day, needed);
-            slot.startMinutes += needed;
+          if (tryAllocate(target: target, day: day, affinityOnly: true)) {
             madeProgress = true;
+          }
+        }
+      }
+    }
 
-            // Remove slot if fully consumed or too small.
-            if (slot.duration < kMinBlockMinutes) {
-              freeSlotsByDay[day]!.remove(slot);
-            }
+    // ── Pass 3: Flexible Spillover for any remaining quota ──
+    madeProgress = true;
+    while (madeProgress) {
+      madeProgress = false;
+      for (int day = kMonday; day <= kSunday; day++) {
+        for (final target in sortedTargets) {
+          if (tryAllocate(target: target, day: day, affinityOnly: false)) {
+            madeProgress = true;
           }
         }
       }
@@ -360,14 +402,18 @@ class PlannerService {
   }
 
   /// Calculates how many minutes to allocate from a slot, respecting
-  /// the minimum block size, daily cap, and weekly remaining.
+  /// the minimum block size, daily cap, weekly remaining, and optional session limit.
   static int _calculateAllocation({
     required int remaining,
     required int dailyRemaining,
     required int slotDuration,
+    int? maxSessionMinutes,
   }) {
     // How much we'd ideally allocate.
     int needed = remaining;
+    if (maxSessionMinutes != null && needed > maxSessionMinutes) {
+      needed = maxSessionMinutes;
+    }
     if (needed > dailyRemaining) needed = dailyRemaining;
     if (needed > slotDuration) needed = slotDuration;
 
@@ -375,7 +421,8 @@ class PlannerService {
     if (needed < kMinBlockMinutes) {
       if (slotDuration >= kMinBlockMinutes &&
           dailyRemaining >= kMinBlockMinutes &&
-          remaining >= kMinBlockMinutes) {
+          remaining >= kMinBlockMinutes &&
+          (maxSessionMinutes == null || maxSessionMinutes >= kMinBlockMinutes)) {
         needed = kMinBlockMinutes;
       } else {
         return 0; // Can't fit a valid block.

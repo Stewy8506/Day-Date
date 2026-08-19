@@ -1,4 +1,4 @@
-/// Bottom sheet for adding a schedule deviation.
+/// Bottom sheet for adding a schedule deviation or marking college off.
 library;
 
 import 'package:flutter/material.dart';
@@ -6,8 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:day_date/core/constants/schedule_constants.dart';
+import 'package:day_date/core/theme/app_colors.dart';
+import 'package:day_date/core/theme/app_typography.dart';
 import 'package:day_date/features/schedule/application/providers/schedule_providers.dart';
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
+import 'package:day_date/features/schedule/presentation/widgets/tactile_interactive.dart';
 
 class AddDeviationSheet extends ConsumerStatefulWidget {
   const AddDeviationSheet({super.key});
@@ -35,14 +38,22 @@ class _AddDeviationSheetState extends ConsumerState<AddDeviationSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        border: Border(
+          top: BorderSide(color: AppColors.surfaceBorder, width: 1),
+        ),
+      ),
       padding: EdgeInsets.only(
         left: 20,
         right: 20,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        top: 14,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -50,10 +61,10 @@ class _AddDeviationSheetState extends ConsumerState<AddDeviationSheet> {
             // Handle bar
             Center(
               child: Container(
-                width: 40,
+                width: 32,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: AppColors.surfaceBorder,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -61,67 +72,123 @@ class _AddDeviationSheetState extends ConsumerState<AddDeviationSheet> {
             const SizedBox(height: 16),
 
             // Title
-            const Text(
-              'Add Deviation',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 20),
-
-            // Type toggle
-            SegmentedButton<DeviationType>(
-              segments: const [
-                ButtonSegment(
-                  value: DeviationType.blockout,
-                  label: Text('Blockout'),
-                  icon: Icon(Icons.block),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'OVERRIDE',
+                      style: AppTypography.overline(color: AppColors.textTertiary),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      'Schedule Deviation',
+                      style: AppTypography.sectionTitle(),
+                    ),
+                  ],
                 ),
-                ButtonSegment(
-                  value: DeviationType.extension,
-                  label: Text('Extension'),
-                  icon: Icon(Icons.add_circle_outline),
-                ),
-                ButtonSegment(
-                  value: DeviationType.collegeCancellation,
-                  label: Text('College Off'),
-                  icon: Icon(Icons.school_outlined),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded, color: AppColors.textTertiary, size: 20),
                 ),
               ],
-              selected: {_deviationType},
-              onSelectionChanged: (s) =>
-                  setState(() => _deviationType = s.first),
+            ),
+            const SizedBox(height: 16),
+
+            // Type Segmented Toggle
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.surfaceBorder),
+              ),
+              padding: const EdgeInsets.all(3),
+              child: Row(
+                children: [
+                  _buildSegment(
+                    label: 'Blockout',
+                    type: DeviationType.blockout,
+                  ),
+                  _buildSegment(
+                    label: 'Extension',
+                    type: DeviationType.extension,
+                  ),
+                  _buildSegment(
+                    label: 'College Off',
+                    type: DeviationType.collegeCancellation,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
 
             // Label (auto-filled for college cancellation)
-            if (!_isCollegeCancellation)
+            if (!_isCollegeCancellation) ...[
               TextField(
                 controller: _labelController,
-                decoration: const InputDecoration(
+                style: AppTypography.body(color: AppColors.textPrimary),
+                decoration: InputDecoration(
                   labelText: 'Label',
-                  hintText: 'e.g., Outing, Doctor appointment',
-                  border: OutlineInputBorder(),
+                  labelStyle: AppTypography.caption(color: AppColors.textSecondary),
+                  hintText: 'e.g., Doctor Appointment, Outing',
+                  hintStyle: AppTypography.caption(color: AppColors.textTertiary),
+                  filled: true,
+                  fillColor: AppColors.background,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.surfaceBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.surfaceBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.textSecondary),
+                  ),
                 ),
               ),
-            if (!_isCollegeCancellation) const SizedBox(height: 16),
+              const SizedBox(height: 12),
+            ],
 
             // Day picker
             DropdownButtonFormField<int>(
               initialValue: _selectedDay,
+              dropdownColor: AppColors.surfaceElevated,
+              style: AppTypography.body(color: AppColors.textPrimary),
               decoration: InputDecoration(
-                labelText: _isCollegeCancellation ? 'College Off Day' : 'Day',
-                border: const OutlineInputBorder(),
+                labelText: _isCollegeCancellation ? 'College Day' : 'Day of Week',
+                labelStyle: AppTypography.caption(color: AppColors.textSecondary),
+                filled: true,
+                fillColor: AppColors.background,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.surfaceBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.surfaceBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.textSecondary),
+                ),
               ),
               items: kDayNames.entries
                   .map((e) => DropdownMenuItem(
                         value: e.key,
-                        child: Text(e.value),
+                        child: Text(e.value, style: AppTypography.body(color: AppColors.textPrimary)),
                       ))
                   .toList(),
               onChanged: (v) {
                 if (v != null) setState(() => _selectedDay = v);
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // Time pickers — only for blockout/extension
             if (!_isCollegeCancellation) ...[
@@ -129,76 +196,132 @@ class _AddDeviationSheetState extends ConsumerState<AddDeviationSheet> {
                 children: [
                   Expanded(
                     child: _TimePicker(
-                      label: 'Start',
+                      label: 'Start Time',
                       time: _startTime,
                       onChanged: (t) => setState(() => _startTime = t),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: _TimePicker(
-                      label: 'End',
+                      label: 'End Time',
                       time: _endTime,
                       onChanged: (t) => setState(() => _endTime = t),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
             ],
 
             // Off-day strategy — only for college cancellation
             if (_isCollegeCancellation) ...[
-              const Text(
-                'Re-balancing Strategy',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.surfaceBorder),
                 ),
-              ),
-              const SizedBox(height: 8),
-              RadioGroup<OffDayStrategy>(
-                groupValue: _offDayStrategy,
-                onChanged: (v) {
-                  if (v != null) setState(() => _offDayStrategy = v);
-                },
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RadioListTile<OffDayStrategy>(
-                      title: const Text('Accelerate Week'),
-                      subtitle: const Text(
-                        'Use freed hours for study/work targets',
-                      ),
-                      value: OffDayStrategy.accelerateWeek,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
+                    Text(
+                      'RE-BALANCING STRATEGY',
+                      style: AppTypography.overline(color: AppColors.textTertiary),
                     ),
-                    RadioListTile<OffDayStrategy>(
-                      title: const Text('Rest & Leisure'),
-                      subtitle: const Text(
-                        'Keep freed hours as unallocated free time',
+                    const SizedBox(height: 8),
+                    RadioGroup<OffDayStrategy>(
+                      groupValue: _offDayStrategy,
+                      onChanged: (v) {
+                        if (v != null) setState(() => _offDayStrategy = v);
+                      },
+                      child: Column(
+                        children: [
+                          RadioListTile<OffDayStrategy>(
+                            title: Text(
+                              'Accelerate Week',
+                              style: AppTypography.bodyMedium(),
+                            ),
+                            subtitle: Text(
+                              'Redistribute study goals into freed hours.',
+                              style: AppTypography.caption(color: AppColors.textSecondary),
+                            ),
+                            value: OffDayStrategy.accelerateWeek,
+                            activeColor: AppColors.textPrimary,
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                          ),
+                          const Divider(height: 8),
+                          RadioListTile<OffDayStrategy>(
+                            title: Text(
+                              'Rest & Leisure',
+                              style: AppTypography.bodyMedium(),
+                            ),
+                            subtitle: Text(
+                              'Leave freed hours open as unallocated rest time.',
+                              style: AppTypography.caption(color: AppColors.textSecondary),
+                            ),
+                            value: OffDayStrategy.restAndLeisure,
+                            activeColor: AppColors.textPrimary,
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                          ),
+                        ],
                       ),
-                      value: OffDayStrategy.restAndLeisure,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
             ],
 
-            const SizedBox(height: 8),
-
-            // Submit
-            FilledButton.icon(
-              onPressed: _submit,
-              icon: const Icon(Icons.check),
-              label: Text(
-                  _isCollegeCancellation ? 'Mark College Off' : 'Add Deviation'),
+            // Tactile Submit Button
+            Tactile(
+              onTap: _submit,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                decoration: BoxDecoration(
+                  color: AppColors.textPrimary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _isCollegeCancellation ? 'Apply College Off' : 'Add Deviation',
+                  style: AppTypography.badge(color: AppColors.background).copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSegment({
+    required String label,
+    required DeviationType type,
+  }) {
+    final isSelected = _deviationType == type;
+    return Expanded(
+      child: Tactile(
+        onTap: () => setState(() => _deviationType = type),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.surfaceElevated : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: AppTypography.caption(
+              color: isSelected ? AppColors.textPrimary : AppColors.textTertiary,
+            ).copyWith(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500),
+          ),
         ),
       ),
     );
@@ -213,7 +336,6 @@ class _AddDeviationSheetState extends ConsumerState<AddDeviationSheet> {
   }
 
   void _submitCollegeCancellation() {
-    // Use a reference date — today's week for the selected day.
     final now = DateTime.now();
     final currentWeekday = now.weekday;
     final daysUntilTarget = (_selectedDay - currentWeekday) % 7;
@@ -284,7 +406,7 @@ class _TimePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return Tactile(
       onTap: () async {
         final picked = await showTimePicker(
           context: context,
@@ -292,12 +414,27 @@ class _TimePicker extends StatelessWidget {
         );
         if (picked != null) onChanged(picked);
       },
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.surfaceBorder),
         ),
-        child: Text(time.format(context)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label.toUpperCase(),
+              style: AppTypography.overline(color: AppColors.textTertiary),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              time.format(context),
+              style: AppTypography.monoNumber(fontSize: 13, color: AppColors.textPrimary),
+            ),
+          ],
+        ),
       ),
     );
   }

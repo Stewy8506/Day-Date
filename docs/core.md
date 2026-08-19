@@ -17,14 +17,14 @@ Global constants that parameterize the scheduling engine.
 | Constant | Type | Value | Description |
 |:---------|:-----|:------|:------------|
 | `kMinBlockMinutes` | `int` | `90` | Minimum duration for any floating block. Blocks shorter than this are never created. |
-| `kDayStartMinutes` | `int` | `360` (6:00 AM) | Earliest time the engine considers for scheduling. |
+| `kDayStartMinutes` | `int` | `450` (7:30 AM) | Earliest time the engine considers for scheduling. |
 | `kDayEndMinutes` | `int` | `1439` (11:59 PM) | Latest time the engine considers. |
 
 ### Time Affinity Windows
 
 | Constant | Value | Window |
 |:---------|:------|:-------|
-| `kMorningStart` / `kMorningEnd` | `360` / `720` | 6:00 AM – 12:00 PM |
+| `kMorningStart` / `kMorningEnd` | `450` / `720` | 7:30 AM – 12:00 PM |
 | `kAfternoonStart` / `kAfternoonEnd` | `720` / `1140` | 12:00 PM – 7:00 PM |
 | `kLateNightStart` / `kLateNightEnd` | `1290` / `1439` | 9:30 PM – 11:59 PM |
 

@@ -94,8 +94,39 @@ final removeDeviationProvider = Provider<Future<void> Function(String)>(
   },
 );
 
+// ── Navigation & Extra Streams ──────────────────────────
+
+/// Tracks the active bottom navigation tab in AppShell.
+final currentNavigationIndexProvider = StateProvider<int>((ref) => 0);
+
+/// Provides the active deviations list as a reactive stream.
+final rawDeviationsProvider = StreamProvider<List<ScheduleDeviation>>((ref) {
+  final repo = ref.watch(scheduleRepositoryProvider);
+  final controller = StreamController<List<ScheduleDeviation>>();
+
+  Future<void> fetch() async {
+    final list = await repo.getDeviations();
+    controller.add(list);
+  }
+
+  fetch();
+  final sub = repo.watchAllChanges().listen((_) => fetch());
+
+  ref.onDispose(() {
+    sub.cancel();
+    controller.close();
+  });
+
+  return controller.stream;
+});
+
+/// Provides the floating task targets list.
+final rawTargetsProvider = FutureProvider((ref) {
+  final repo = ref.watch(scheduleRepositoryProvider);
+  return repo.getTaskTargets();
+});
+
 /// Provider for toggling college attendance on a specific date.
-/// Triggers schedule recomputation automatically via the Hive watch stream.
 final setCollegeStatusProvider = Provider<
     Future<void> Function(DateTime date,
         {required bool isAttending, OffDayStrategy strategy})>(
@@ -108,3 +139,5 @@ final setCollegeStatusProvider = Provider<
             isAttending: isAttending, strategy: strategy);
   },
 );
+
+

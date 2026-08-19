@@ -5,12 +5,12 @@ library;
 const int kMinBlockMinutes = 90;
 
 /// Day boundaries (minutes since midnight).
-const int kDayStartMinutes = 360; // 06:00 AM
+const int kDayStartMinutes = 450; // 07:30 AM
 const int kDayEndMinutes = 1439; // 23:59 PM
 
 /// Time affinity window boundaries (minutes since midnight).
-const int kMorningStart = 360; // 06:00
-const int kMorningEnd = 720; // 12:00
+const int kMorningStart = 450; // 07:30 AM
+const int kMorningEnd = 720; // 12:00 PM
 const int kAfternoonStart = 720; // 12:00
 const int kAfternoonEnd = 1140; // 19:00
 const int kLateNightStart = 1290; // 21:30

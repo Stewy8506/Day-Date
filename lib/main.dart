@@ -9,12 +9,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import 'package:day_date/core/constants/schedule_constants.dart';
+import 'package:day_date/core/theme/app_theme.dart';
 import 'package:day_date/features/schedule/data/datasources/local_schedule_datasource.dart';
 import 'package:day_date/features/schedule/data/models/schedule_deviation_model.dart';
 import 'package:day_date/features/schedule/data/models/task_target_model.dart';
 import 'package:day_date/features/schedule/data/models/time_block_model.dart';
 import 'package:day_date/features/schedule/data/repositories/schedule_repository_impl.dart';
-import 'package:day_date/features/schedule/presentation/screens/weekly_overview_screen.dart';
+import 'package:day_date/features/schedule/presentation/screens/app_shell.dart';
 import 'package:day_date/hive_registrar.g.dart';
 
 void main() async {
@@ -50,12 +51,10 @@ class DayDateApp extends StatelessWidget {
     return MaterialApp(
       title: 'Day-Date',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
-        useMaterial3: true,
-        brightness: Brightness.light,
-      ),
-      home: const WeeklyOverviewScreen(),
+      theme: AppTheme.darkTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.dark,
+      home: const AppShell(),
     );
   }
 }

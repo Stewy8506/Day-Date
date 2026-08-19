@@ -1,10 +1,13 @@
-/// A compact column showing one day's schedule in the weekly overview.
+/// A warm greyscale tactile day capsule in the 7-day selector strip.
 library;
 
 import 'package:flutter/material.dart';
 
 import 'package:day_date/core/constants/schedule_constants.dart';
+import 'package:day_date/core/theme/app_colors.dart';
+import 'package:day_date/core/theme/app_typography.dart';
 import 'package:day_date/features/schedule/domain/entities/time_block.dart';
+import 'package:day_date/features/schedule/presentation/widgets/tactile_interactive.dart';
 
 class DayColumn extends StatelessWidget {
   final int dayOfWeek;
@@ -22,111 +25,92 @@ class DayColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dayName = kDayNames[dayOfWeek]!;
-    final shortName = dayName.substring(0, 3);
+    final dayName = kDayNames[dayOfWeek] ?? '';
+    final shortName = dayName.length >= 3 ? dayName.substring(0, 3).toUpperCase() : dayName;
 
-    return GestureDetector(
+    // Calculate total scheduled hours for this day
+    final totalMinutes = blocks.fold(0, (sum, b) => sum + b.durationMinutes);
+    final totalHours = (totalMinutes / 60).toStringAsFixed(1);
+
+    return Tactile(
       onTap: onTap,
-      child: Container(
-        width: 64,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(vertical: 8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        width: 58,
+        margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
         decoration: BoxDecoration(
-          color: isSelected
-              ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected
-              ? Border.all(
-                  color: Theme.of(context).primaryColor,
-                  width: 1.5,
-                )
+          color: isSelected ? AppColors.surfaceActive : AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? AppColors.textSecondary : AppColors.surfaceBorder,
+            width: isSelected ? 1.4 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
               : null,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Day header
-            Text(
-              shortName,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: isSelected
-                    ? Theme.of(context).primaryColor
-                    : Colors.grey[700],
-              ),
-            ),
-            const SizedBox(height: 6),
-            // Mini-blocks
-            ...blocks.take(6).map((b) => _MiniBlock(block: b)),
-            if (blocks.length > 6)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  '+${blocks.length - 6}',
-                  style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+            // Day Overline (e.g., "MON")
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                shortName,
+                style: AppTypography.overline(
+                  color: isSelected ? AppColors.textPrimary : AppColors.textTertiary,
                 ),
               ),
+            ),
+            const SizedBox(height: 4),
+
+            // Number of blocks badge
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected
+                    ? AppColors.textPrimary
+                    : AppColors.background.withValues(alpha: 0.7),
+              ),
+              alignment: Alignment.center,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '${blocks.length}',
+                  style: AppTypography.monoNumber(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: isSelected ? AppColors.background : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+
+            // Scheduled duration in hours
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '${totalHours}h',
+                style: AppTypography.monoTime(
+                  color: isSelected ? AppColors.textSecondary : AppColors.textTertiary,
+                ).copyWith(fontSize: 10),
+              ),
+            ),
           ],
         ),
       ),
     );
-  }
-}
-
-class _MiniBlock extends StatelessWidget {
-  final TimeBlock block;
-
-  const _MiniBlock({required this.block});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 48,
-      height: 14,
-      margin: const EdgeInsets.only(bottom: 2),
-      decoration: BoxDecoration(
-        color: _color.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(3),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        _shortLabel,
-        style: const TextStyle(
-          fontSize: 7,
-          color: Colors.white,
-          fontWeight: FontWeight.w500,
-        ),
-        overflow: TextOverflow.clip,
-      ),
-    );
-  }
-
-  String get _shortLabel {
-    if (block.label.length <= 5) return block.label;
-    return '${block.label.substring(0, 4)}…';
-  }
-
-  Color get _color {
-    switch (block.type) {
-      case TimeBlockType.fixed:
-        return Colors.blueGrey;
-      case TimeBlockType.deviation:
-        return Colors.red;
-      case TimeBlockType.floating:
-        switch (block.label) {
-          case 'SWE Roadmap':
-            return Colors.indigo;
-          case 'CAT Prep':
-            return Colors.teal;
-          case 'Freelancing':
-            return Colors.deepPurple;
-          case 'ECE Upkeep':
-            return Colors.orange;
-          default:
-            return Colors.blue;
-        }
-    }
   }
 }

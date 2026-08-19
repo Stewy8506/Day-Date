@@ -115,7 +115,7 @@ void main() {
   });
 
   group('PlannerService — Baseline Schedule', () {
-    test('generates schedule for all 7 days', () {
+    test('generates schedule for all 7 days with balanced weekend', () {
       final result = planner.computeWeeklySchedule(
         fixedBlocks: fixedBlocks,
         deviations: [],
@@ -125,13 +125,37 @@ void main() {
       for (int day = kMonday; day <= kSunday; day++) {
         expect(result.dailySchedule.containsKey(day), isTrue,
             reason: 'Day $day should be present');
-      }
-      // Mon-Sat should have blocks (fixed blocks exist).
-      for (int day = kMonday; day <= kSaturday; day++) {
         expect(result.dailySchedule[day], isNotEmpty,
-            reason: 'Day $day should have blocks');
+            reason: 'Day $day should have blocks scheduled');
       }
-      // Sunday may or may not have blocks depending on allocation needs.
+
+      // Verify Saturday and Sunday both have significant floating deep-work blocks
+      final satFloating = result.dailySchedule[kSaturday]!
+          .where((b) => b.type == TimeBlockType.floating)
+          .fold(0, (sum, b) => sum + b.durationMinutes);
+      final sunFloating = result.dailySchedule[kSunday]!
+          .where((b) => b.type == TimeBlockType.floating)
+          .fold(0, (sum, b) => sum + b.durationMinutes);
+
+      expect(satFloating, greaterThanOrEqualTo(180),
+          reason: 'Saturday should have at least 3 hours of floating work, got ${satFloating}min');
+      expect(sunFloating, greaterThanOrEqualTo(180),
+          reason: 'Sunday should have at least 3 hours of floating work, got ${sunFloating}min');
+    });
+
+    test('no scheduled block starts before 7:30 AM (450 min)', () {
+      final result = planner.computeWeeklySchedule(
+        fixedBlocks: fixedBlocks,
+        deviations: [],
+        targets: targets,
+      );
+
+      for (final dayBlocks in result.dailySchedule.values) {
+        for (final block in dayBlocks) {
+          expect(block.startMinutes, greaterThanOrEqualTo(kDayStartMinutes),
+              reason: '${block.label} starts at ${block.startMinutes}m, before 7:30 AM (450m)');
+        }
+      }
     });
 
     test('no overlaps in generated schedule', () {

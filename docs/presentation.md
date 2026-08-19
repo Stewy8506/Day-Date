@@ -2,7 +2,7 @@
 
 **Path**: `lib/features/schedule/presentation/`
 
-The presentation layer contains the UI widgets, screens, and user interaction forms. It is decoupled from direct database operations and communicates strictly via Riverpod providers.
+The presentation layer is organized into a clean **multi-page application architecture** with an interactive tactile navigation shell (`AppShell`).
 
 ---
 
@@ -11,125 +11,85 @@ The presentation layer contains the UI widgets, screens, and user interaction fo
 ```
 lib/features/schedule/presentation/
 ├── screens/
-│   ├── weekly_overview_screen.dart # Main screen (weekly strip + summary + daily timeline)
-│   └── daily_detail_screen.dart    # Detailed timeline list with Floating Action Button
+│   ├── app_shell.dart              # Main shell with tactile bottom navigation bar
+│   ├── daily_schedule_page.dart    # Dedicated Day Timeline & quick college off toggle
+│   ├── weekly_matrix_page.dart     # Full-screen 7-day routine overview & day inspect
+│   ├── targets_dashboard_page.dart # Dedicated weekly goals, quotas & distribution tracking
+│   └── deviations_manager_page.dart# Overrides, disruptions & college attendance matrix
 └── widgets/
     ├── add_deviation_sheet.dart    # Modal bottom sheet form for deviations / cancellations
-    ├── day_column.dart             # Mini-block day column used in the weekly strip
-    └── time_block_card.dart        # Chronological timeline card with color coding
+    ├── day_column.dart             # Tactile day selector capsule
+    ├── tactile_interactive.dart    # Physics spring-scale feedback container
+    └── time_block_card.dart        # Minimalist timeline card with duration badges
 ```
 
 ---
 
-## Screens
+## Screen Catalog
 
-### 1. `WeeklyOverviewScreen` (`weekly_overview_screen.dart`)
-
-The primary home screen of the application. It watches `weeklyScheduleProvider` and `selectedDayProvider`.
-
-```
-┌──────────────────────────────────────────────┐
-│  AppBar: "Day-Date"                          │
-├──────────────────────────────────────────────┤
-│  Weekly Strip: [Mon] [Tue] [Wed] [Thu] ...   │
-├──────────────────────────────────────────────┤
-│  Allocation Summary Bar (Chips & Warnings)   │
-├──────────────────────────────────────────────┤
-│  Daily Detail Timeline (for selected day)    │
-│  - TimeBlockCard 1                           │
-│  - TimeBlockCard 2                           │
-│  - ...                                       │
-│                                      [ + FAB]│
-└──────────────────────────────────────────────┘
-```
-
-#### Key Sections:
-- **Weekly Strip**: Horizontal scroll view with 7 `DayColumn` widgets representing Monday through Sunday. Tapping a column updates `selectedDayProvider`.
-- **Allocation Summary (`_AllocationSummary`)**: Renders chips showing total allocated hours per target and highlights warnings if any target could not fulfill its weekly quota.
-- **Embedded `DailyDetailScreen`**: Displays the full chronological schedule of the selected day.
+### 1. `AppShell` (`app_shell.dart`)
+Main root scaffold connecting the 4 dedicated pages:
+- **Navigation Tabs**:
+  - `Daily` (`Icons.calendar_today_rounded`): Immersive daily schedule & timeline.
+  - `Week` (`Icons.view_week_rounded`): Full 7-day matrix inspector.
+  - `Targets` (`Icons.track_changes_rounded`): Floating goals & weekly quota dashboard.
+  - `Overrides` (`Icons.tune_rounded`): College status matrix & custom deviations.
+- **Micro-Interactions**: Tactile spring-scale compression on tab press with active capsule highlight.
 
 ---
 
-### 2. `DailyDetailScreen` (`daily_detail_screen.dart`)
-
-Displays the detailed schedule for a specific day.
-
-#### Components:
-- **Header**: Shows day title (e.g. `"Monday"`) and total number of blocks scheduled.
-- **Timeline List**:
-  - If empty: Shows an empty state illustration with text `"No blocks scheduled"`.
-  - If populated: Renders a scrollable `ListView.builder` of `TimeBlockCard`s.
-- **Floating Action Button (FAB)**:
-  - Tapping opens the `AddDeviationSheet` in a modal bottom sheet.
+### 2. `DailySchedulePage` (`daily_schedule_page.dart`)
+Dedicated full-screen timeline for inspecting and adjusting a single day:
+- **7-Day Selector Strip**: Horizontal day-switch carousel with `DayColumn` pills.
+- **Day Subheader**: Active day name, block count, total scheduled duration, and a one-tap **"College Off" / "Attending" toggle chip**.
+- **Full-Bleed Timeline**: Smooth scrollable list of `TimeBlockCard`s with zero nested scrolling conflicts.
 
 ---
 
-## Widgets
-
-### 1. `TimeBlockCard` (`time_block_card.dart`)
-
-Renders an individual block in the daily timeline.
-
-#### Visual Styling:
-- **Color Coding**:
-  - `TimeBlockType.fixed`: Neutral slate background and blue-grey accent bar.
-  - `TimeBlockType.floating`: Categorized accent colors with soft tint background.
-  - `TimeBlockType.deviation`: Highlighted red border and red background.
-- **Duration Badge**: Shows formatted duration (e.g., `"1h 30m"`) on the right edge.
-- **Time Format**: Displays start and end times in 12-hour AM/PM format (e.g. `10:00 AM – 11:30 AM`).
+### 3. `WeeklyMatrixPage` (`weekly_matrix_page.dart`)
+Full-screen 7-day routine inspector:
+- **Weekly Metrics**: Total hours scheduled and 7-day balance indicator.
+- **7-Day Card List**: Displays day cards (Monday through Sunday) with block chips and duration breakdowns.
+- **Tap-to-Inspect**: Tapping any day card immediately selects that day and switches to the `Daily` page.
 
 ---
 
-### 2. `DayColumn` (`day_column.dart`)
-
-Compact vertical strip used inside the weekly overview.
-
-#### Features:
-- Displays 3-letter day abbreviation (`"Mon"`, `"Tue"`, etc.).
-- Active selection styling (accent border and background tint).
-- Renders up to 6 colored mini-bars (`_MiniBlock`) showing the day's density at a glance, with a `+N` badge if more than 6 blocks exist.
-
----
-
-### 3. `AddDeviationSheet` (`add_deviation_sheet.dart`)
-
-A modal bottom sheet allowing users to add overrides or cancel commitments.
-
-#### Segmented Mode Switcher:
-1. **Blockout**: User enters label, day, start time, and end time.
-2. **Extension**: User enters label, day, start time, and end time.
-3. **College Off (Cancellation)**:
-   - Hides time pickers (operates at the full-day level).
-   - Auto-labels as `"College Off"`.
-   - Offers an `OffDayStrategy` selector:
-     - **Accelerate Week**: Fills freed hours with study/project targets.
-     - **Rest & Leisure**: Designates freed hours as unallocated leisure.
-   - Computes target `DateTime` and dispatches via `addDeviationProvider`.
+### 4. `TargetsDashboardPage` (`targets_dashboard_page.dart`)
+Dedicated analytics hub for monitoring floating goals:
+- **Overall Fulfillment Progress Bar**: Total scheduled hours vs. weekly quota (e.g. `44.5h / 44.5h • 100%`).
+- **Target Cards**: Individual cards for each target (`SWE Roadmap`, `CAT Prep`, `Freelancing`, `ECE Upkeep`):
+  - Progress bar & percentage.
+  - Priority badge (`P1`, `P2`, etc.).
+  - Time affinity window tag (e.g., `Morning 7:30 AM – 12 PM`).
+  - Daily cap badge (`3.0h/day max`).
+  - 7-day allocation breakdown matrix.
 
 ---
 
-## UI State Flow
+### 5. `DeviationsManagerPage` (`deviations_manager_page.dart`)
+Central hub for managing schedule disruptions:
+- **College Attendance Matrix**: Mon–Fri list with one-tap status toggles (`Attending` ↔ `College Off`) and strategy indicators (`Accelerate Week` / `Rest & Leisure`).
+- **Active Deviations List**: Custom blockouts and extensions with one-tap delete button for instant schedule re-balancing.
+- **Launcher**: Quick access to open `AddDeviationSheet`.
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Screen as WeeklyOverviewScreen
-    participant Sheet as AddDeviationSheet
-    participant Provider as Riverpod (weeklyScheduleProvider)
-    participant Repo as ScheduleRepository
+---
 
-    User->>Screen: Opens App
-    Provider->>Screen: Emits computed ScheduleResult
-    Screen->>User: Renders weekly strip & daily detail
+## Interactive Widgets
 
-    User->>Screen: Taps Wednesday
-    Screen->>Screen: Updates selectedDayProvider to 3
-    Screen->>User: Displays Wednesday timeline
+### 1. `Tactile` (`tactile_interactive.dart`)
+A physics-based spring container providing responsive touch feedback:
+- Scales down to `0.965` on tap down.
+- Springs back with `Curves.easeOutBack` (110ms) on tap release or cancellation.
 
-    User->>Sheet: Opens "Add Deviation" -> "College Off" -> Submit
-    Sheet->>Repo: addDeviation(collegeCancellation)
-    Repo-->>Provider: Notifies change on watchAllChanges()
-    Provider->>Provider: Recomputes Schedule
-    Provider->>Screen: Emits updated ScheduleResult
-    Screen->>User: Updates UI instantaneously
-```
+### 2. `TimeBlockCard` (`time_block_card.dart`)
+Warm minimalist card:
+- Left hairline accent indicator (warm amber for deep work, brushed steel for anchors, terracotta for deviations, sage for leisure).
+- Category overline tag (`FOCUS`, `ANCHOR`, `OVERRIDE`, `LEISURE`).
+- Card title and monospace time range (`07:30 — 09:30`).
+- Compact duration badge.
+
+### 3. `DayColumn` (`day_column.dart`)
+Tactile day capsule in the day selector:
+- Uppercase day abbreviation (`MON`, `TUE`).
+- Circular block count badge.
+- Scheduled duration in hours (`6.0h`).
