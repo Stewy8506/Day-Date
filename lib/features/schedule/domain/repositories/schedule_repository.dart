@@ -24,6 +24,15 @@ abstract class ScheduleRepository {
   /// Removes a deviation by ID.
   Future<void> removeDeviation(String id);
 
+  /// Adds a new task target.
+  Future<void> addTaskTarget(TaskTarget target);
+
+  /// Updates an existing task target.
+  Future<void> updateTaskTarget(TaskTarget target);
+
+  /// Removes a task target by ID.
+  Future<void> removeTaskTarget(String id);
+
   /// Seeds the database with initial fixed blocks and task targets
   /// if the database is empty (first launch).
   Future<void> seedIfEmpty();

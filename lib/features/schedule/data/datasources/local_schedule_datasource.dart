@@ -47,6 +47,9 @@ class LocalScheduleDatasource {
   Future<void> addTaskTarget(TaskTargetModel target) =>
       _taskTargetsBox.put(target.id, target);
 
+  Future<void> removeTaskTarget(String id) =>
+      _taskTargetsBox.delete(id);
+
   // ── Seed ───────────────────────────────────────────────
 
   Future<bool> isSeeded() async =>

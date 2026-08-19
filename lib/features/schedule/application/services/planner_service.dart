@@ -205,11 +205,10 @@ class PlannerService {
           .map((b) => (start: b.startMinutes, end: b.endMinutes))
           .toList();
 
-      // Add Human Transition / Prep Buffers to occupied calculations:
-      // 1. 30-min Lunch / Post-Commute Buffer after afternoon commute or Free Time
-      // 2. 20-min Pre-Gym Prep Buffer before Gym
-      // 3. Weekend Lunch & Rest Window: 2:00 PM – 3:30 PM (840 to 930 min)
-      if (isWeekend) {
+      // 3. Home Day Lunch & Rest Window: 2:00 PM – 3:30 PM (840 to 930 min)
+      // Applies to weekends and any weekday where college is off/cancelled!
+      final isNonCollegeDay = isWeekend || collegeOffDays.containsKey(day);
+      if (isNonCollegeDay) {
         rawOccupied.add((start: 840, end: 930));
       }
 

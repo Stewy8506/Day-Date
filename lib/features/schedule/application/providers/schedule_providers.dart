@@ -12,6 +12,7 @@ import 'package:day_date/features/schedule/application/services/planner_service.
 import 'package:day_date/features/schedule/data/datasources/local_schedule_datasource.dart';
 import 'package:day_date/features/schedule/data/repositories/schedule_repository_impl.dart';
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
+import 'package:day_date/features/schedule/domain/entities/task_target.dart';
 import 'package:day_date/features/schedule/domain/repositories/schedule_repository.dart';
 
 // ── Infrastructure providers ────────────────────────────
@@ -120,11 +121,50 @@ final rawDeviationsProvider = StreamProvider<List<ScheduleDeviation>>((ref) {
   return controller.stream;
 });
 
-/// Provides the floating task targets list.
-final rawTargetsProvider = FutureProvider((ref) {
+/// Provides the floating task targets list as a reactive stream.
+final rawTargetsProvider = StreamProvider<List<TaskTarget>>((ref) {
   final repo = ref.watch(scheduleRepositoryProvider);
-  return repo.getTaskTargets();
+  final controller = StreamController<List<TaskTarget>>();
+
+  Future<void> fetch() async {
+    final list = await repo.getTaskTargets();
+    controller.add(list);
+  }
+
+  fetch();
+  final sub = repo.watchAllChanges().listen((_) => fetch());
+
+  ref.onDispose(() {
+    sub.cancel();
+    controller.close();
+  });
+
+  return controller.stream;
 });
+
+/// Provider for updating an existing task target.
+final updateTaskTargetProvider = Provider<Future<void> Function(TaskTarget)>(
+  (ref) {
+    final repo = ref.watch(scheduleRepositoryProvider);
+    return (target) => repo.updateTaskTarget(target);
+  },
+);
+
+/// Provider for adding a new task target.
+final addTaskTargetProvider = Provider<Future<void> Function(TaskTarget)>(
+  (ref) {
+    final repo = ref.watch(scheduleRepositoryProvider);
+    return (target) => repo.addTaskTarget(target);
+  },
+);
+
+/// Provider for removing a task target.
+final removeTaskTargetProvider = Provider<Future<void> Function(String)>(
+  (ref) {
+    final repo = ref.watch(scheduleRepositoryProvider);
+    return (id) => repo.removeTaskTarget(id);
+  },
+);
 
 /// Provider for toggling college attendance on a specific date.
 final setCollegeStatusProvider = Provider<

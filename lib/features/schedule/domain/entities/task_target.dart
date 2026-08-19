@@ -52,6 +52,24 @@ class TaskTarget extends Equatable {
   /// Daily cap in minutes.
   int get dailyCapMinutes => (dailyCapHours * 60).round();
 
+  TaskTarget copyWith({
+    String? id,
+    String? name,
+    double? weeklyHours,
+    int? priority,
+    TimeAffinity? affinity,
+    double? dailyCapHours,
+  }) {
+    return TaskTarget(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      weeklyHours: weeklyHours ?? this.weeklyHours,
+      priority: priority ?? this.priority,
+      affinity: affinity ?? this.affinity,
+      dailyCapHours: dailyCapHours ?? this.dailyCapHours,
+    );
+  }
+
   @override
   List<Object?> get props =>
       [id, name, weeklyHours, priority, affinity, dailyCapHours];

@@ -11,6 +11,8 @@ import 'package:day_date/core/theme/app_typography.dart';
 import 'package:day_date/core/utils/time_utils.dart';
 import 'package:day_date/features/schedule/application/providers/schedule_providers.dart';
 import 'package:day_date/features/schedule/domain/entities/task_target.dart';
+import 'package:day_date/features/schedule/presentation/widgets/edit_target_sheet.dart';
+import 'package:day_date/features/schedule/presentation/widgets/tactile_interactive.dart';
 
 class TargetsDashboardPage extends ConsumerWidget {
   const TargetsDashboardPage({super.key});
@@ -49,17 +51,45 @@ class TargetsDashboardPage extends ConsumerWidget {
                     // ── Header Bar ──────────────────────────────
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'FLOATING TARGETS',
-                            style: AppTypography.overline(color: AppColors.textTertiary),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'FLOATING TARGETS',
+                                style: AppTypography.overline(color: AppColors.textTertiary),
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                'Goals & Quotas',
+                                style: AppTypography.heroTitle(),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 1),
-                          Text(
-                            'Goals & Quotas',
-                            style: AppTypography.heroTitle(),
+                          Tactile(
+                            onTap: () => EditTargetSheet.show(context),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceElevated,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.surfaceBorder),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.add, size: 14, color: AppColors.accentWarm),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Add Goal',
+                                    style: AppTypography.caption(color: AppColors.accentWarm)
+                                        .copyWith(fontWeight: FontWeight.w600, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -141,56 +171,65 @@ class TargetsDashboardPage extends ConsumerWidget {
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppColors.surfaceBorder),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Title + Priority Row
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Row(
+                            child: Tactile(
+                              onTap: () => EditTargetSheet.show(context, target: target),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: AppColors.surfaceBorder),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Title + Priority Row
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.surfaceElevated,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  border: Border.all(color: AppColors.surfaceBorder),
+                                                ),
+                                                child: Text(
+                                                  'P${target.priority}',
+                                                  style: AppTypography.overline(color: AppColors.accentWarm),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  target.name,
+                                                  style: AppTypography.cardTitle(color: AppColors.textPrimary),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: AppColors.surfaceElevated,
-                                                borderRadius: BorderRadius.circular(4),
-                                                border: Border.all(color: AppColors.surfaceBorder),
-                                              ),
-                                              child: Text(
-                                                'P${target.priority}',
-                                                style: AppTypography.overline(color: AppColors.accentWarm),
+                                            Text(
+                                              '${allocated.toStringAsFixed(1)} / ${target.weeklyHours.toStringAsFixed(1)}h',
+                                              style: AppTypography.monoNumber(
+                                                fontSize: 13,
+                                                color: AppColors.textPrimary,
                                               ),
                                             ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                target.name,
-                                                style: AppTypography.cardTitle(color: AppColors.textPrimary),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
+                                            const SizedBox(width: 6),
+                                            const Icon(Icons.edit_outlined, size: 14, color: AppColors.textTertiary),
                                           ],
                                         ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        '${allocated.toStringAsFixed(1)} / ${target.weeklyHours.toStringAsFixed(1)}h',
-                                        style: AppTypography.monoNumber(
-                                          fontSize: 13,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                      ],
+                                    ),
 
                                   const SizedBox(height: 10),
 
@@ -273,8 +312,9 @@ class TargetsDashboardPage extends ConsumerWidget {
                                 ],
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        );
+                      },
                       ),
                     ),
                   ],

@@ -39,6 +39,18 @@ class ScheduleRepositoryImpl implements ScheduleRepository {
       _datasource.removeDeviation(id);
 
   @override
+  Future<void> addTaskTarget(TaskTarget target) async =>
+      _datasource.addTaskTarget(target.toModel());
+
+  @override
+  Future<void> updateTaskTarget(TaskTarget target) async =>
+      _datasource.addTaskTarget(target.toModel());
+
+  @override
+  Future<void> removeTaskTarget(String id) async =>
+      _datasource.removeTaskTarget(id);
+
+  @override
   Future<bool> isFirstLaunch() async => !(await _datasource.isSeeded());
 
   @override
