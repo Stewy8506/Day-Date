@@ -39,12 +39,10 @@ class _AddDeviationSheetState extends ConsumerState<AddDeviationSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        border: Border(
-          top: BorderSide(color: AppColors.surfaceBorder, width: 1),
-        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+        border: Border.all(color: AppColors.surfaceBorder, width: 1),
       ),
       padding: EdgeInsets.only(
         left: 20,

@@ -54,6 +54,14 @@ abstract class AppTypography {
         color: color,
       );
 
+  static TextStyle headerSubtext({Color color = AppColors.textSecondary}) =>
+      GoogleFonts.outfit(
+        fontSize: 13,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0.1,
+        color: color,
+      );
+
   // ── Geometric Structure & UI (Outfit) ─────────────────
   static TextStyle heroTitle({Color color = AppColors.textPrimary}) =>
       GoogleFonts.outfit(

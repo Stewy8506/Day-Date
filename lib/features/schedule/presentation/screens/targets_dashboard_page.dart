@@ -54,19 +54,9 @@ class TargetsDashboardPage extends ConsumerWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'FLOATING TARGETS',
-                                style: AppTypography.overline(color: AppColors.textTertiary),
-                              ),
-                              const SizedBox(height: 1),
-                              Text(
-                                'Goals & Quotas',
-                                style: AppTypography.editorialHero(color: AppColors.textPrimary),
-                              ),
-                            ],
+                          Text(
+                            'Goals & Quotas',
+                            style: AppTypography.editorialHero(color: AppColors.textPrimary),
                           ),
                           Tactile(
                             onTap: () => EditTargetSheet.show(context),
@@ -160,11 +150,7 @@ class TargetsDashboardPage extends ConsumerWidget {
                           final target = targets[index];
                           final romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
                           final romanIndex = index < romanNumerals.length ? romanNumerals[index] : '${index + 1}';
-                          final completions = ref.watch(rawTaskCompletionsProvider).value ?? [];
-                          final extraOvertimeMinutes = completions
-                              .where((c) => c.targetId == target.id && c.actualMinutes > c.scheduledMinutes)
-                              .fold(0, (sum, c) => sum + (c.actualMinutes - c.scheduledMinutes));
-                          final allocated = (result.allocatedHours[target.id] ?? 0.0) + (extraOvertimeMinutes / 60.0);
+                          final allocated = result.allocatedHours[target.id] ?? 0.0;
                           final percent = target.weeklyHours > 0
                               ? (allocated / target.weeklyHours).clamp(0.0, 1.0)
                               : 0.0;

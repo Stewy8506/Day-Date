@@ -72,9 +72,47 @@ class _TargetAllocation {
 
   int get remainingMinutes => target.weeklyMinutes - totalAllocatedMinutes;
 
-  int dailyCapForDay(int day, bool isCollegeDay) => target.weeklyMinutes;
+  int dailyCapForDay(
+    int day,
+    bool isCollegeDay, {
+    bool ignoreCapOnFreeDays = false,
+    bool isUnderPressure = false,
+  }) {
+    final isFreeDay = !isCollegeDay;
+    if (isFreeDay && (ignoreCapOnFreeDays || day == kSaturday || day == kSunday)) {
+      return 1440; // Lift daily cap on free days (weekends & college-off) to absorb full spillover
+    }
+    if (isCollegeDay) {
+      final baseCap = max(kMinBlockMinutes, target.dailyCapMinutes);
+      return isUnderPressure ? (baseCap * 1.3).round() : baseCap;
+    }
+    // On Sunday / standard free days, morning sessions run up to 300m (5h) until lunch
+    final freeDayCap = target.affinity == TimeAffinity.morning ? 300 : 270;
+    final base = max(
+      target.dailyCapMinutes,
+      min(
+        freeDayCap,
+        max((target.dailyCapMinutes * 1.5).round(), (target.weeklyMinutes / 3).round()),
+      ),
+    );
+    return isUnderPressure ? min(1440, (base * 1.3).round()) : base;
+  }
 
-  int remainingForDay(int day, bool isCollegeDay) => remainingMinutes;
+  int remainingForDay(
+    int day,
+    bool isCollegeDay, {
+    bool ignoreCapOnFreeDays = false,
+    bool isUnderPressure = false,
+  }) {
+    final cap = dailyCapForDay(
+      day,
+      isCollegeDay,
+      ignoreCapOnFreeDays: ignoreCapOnFreeDays,
+      isUnderPressure: isUnderPressure,
+    );
+    final allocatedToday = dailyAllocatedMinutes[day] ?? 0;
+    return max(0, min(remainingMinutes, cap - allocatedToday));
+  }
 
   bool get isFilled => totalAllocatedMinutes >= target.weeklyMinutes;
 
@@ -82,6 +120,21 @@ class _TargetAllocation {
     totalAllocatedMinutes += minutes;
     dailyAllocatedMinutes[day] = (dailyAllocatedMinutes[day] ?? 0) + minutes;
   }
+}
+
+/// User-configurable lunch & rest window settings.
+class LunchWindowSettings {
+  final bool isEnabled;
+  final int startMinutes;
+  final int endMinutes;
+
+  const LunchWindowSettings({
+    this.isEnabled = true,
+    this.startMinutes = 840, // 2:00 PM (14:00)
+    this.endMinutes = 930,   // 3:30 PM (15:30)
+  });
+
+  int get durationMinutes => endMinutes - startMinutes;
 }
 
 // ──────────────────────────────────────────────────────────
@@ -94,6 +147,8 @@ class PlannerService {
     required List<TimeBlock> fixedBlocks,
     required List<ScheduleDeviation> deviations,
     required List<TaskTarget> targets,
+    LunchWindowSettings lunchSettings = const LunchWindowSettings(),
+    bool ignoreDailyCapOnFreeDays = false,
   }) {
     // ── Step 1: Build occupied map ───────────────────────
 
@@ -199,22 +254,50 @@ class PlannerService {
       );
     }
 
+    // ── Phase 0: Pressure Detection ──────────────────────
+    final totalDemandMinutes = targets.fold(0, (s, t) => s + t.weeklyMinutes);
+
+    int rawFreeCapacity = 0;
+    for (int day = kMonday; day <= kSunday; day++) {
+      final isWeekend = (day == kSaturday || day == kSunday);
+      final isCollegeOff = collegeOffDays.containsKey(day);
+      final dayStart = isWeekend
+          ? kWeekendStartMinutes
+          : (isCollegeOff ? kCollegeOffStartMinutes : kWeekdayStartMinutes);
+      final dayFixed = allOccupied[day]!.fold(0, (sum, b) => sum + b.durationMinutes);
+      final totalDayDuration = kDayEndMinutes - dayStart;
+      rawFreeCapacity += max(0, totalDayDuration - dayFixed);
+    }
+
+    final isUnderPressure = totalDemandMinutes > 0 &&
+        (totalDemandMinutes / rawFreeCapacity.clamp(1, 99999) > 0.70 ||
+            deviations.any((d) => d.type == DeviationType.blockout));
+
     // ── Step 2: Compute free slots with Transition Buffers ──
 
     final freeSlotsByDay = <int, List<FreeSlot>>{};
     for (int day = kMonday; day <= kSunday; day++) {
       final isWeekend = (day == kSaturday || day == kSunday);
-      final dayStart = isWeekend ? kWeekendStartMinutes : kWeekdayStartMinutes;
+      final isCollegeOff = collegeOffDays.containsKey(day);
+      final dayStart = isWeekend
+          ? kWeekendStartMinutes
+          : (isCollegeOff ? kCollegeOffStartMinutes : kWeekdayStartMinutes);
 
       final rawOccupied = allOccupied[day]!
           .map((b) => (start: b.startMinutes, end: b.endMinutes))
           .toList();
 
-      // 3. Home Day Lunch & Rest Window: 2:00 PM – 3:30 PM (840 to 930 min)
-      // Applies to weekends and any weekday where college is off/cancelled!
+      // Configurable Lunch & Rest Window on weekends and college-off days
       final isNonCollegeDay = isWeekend || collegeOffDays.containsKey(day);
-      if (isNonCollegeDay) {
-        rawOccupied.add((start: 840, end: 930));
+      if (isNonCollegeDay && lunchSettings.isEnabled && lunchSettings.durationMinutes > 0) {
+        final effectiveLunchDuration = isUnderPressure
+            ? min(lunchSettings.durationMinutes, kPressureLunchMinutes)
+            : lunchSettings.durationMinutes;
+        final lunchCenter = (lunchSettings.startMinutes + lunchSettings.endMinutes) ~/ 2;
+        rawOccupied.add((
+          start: lunchCenter - effectiveLunchDuration ~/ 2,
+          end: lunchCenter + effectiveLunchDuration ~/ 2,
+        ));
       }
 
       for (final b in allOccupied[day]!) {
@@ -230,17 +313,20 @@ class PlannerService {
             ));
           }
           // Post-college return & unwind buffer (30 min)
-          if (b.startMinutes >= 570) {
-            rawOccupied.add((
-              start: b.endMinutes,
-              end: min(kDayEndMinutes, b.endMinutes + kPostCollegeBufferMinutes),
-            ));
-          }
+          rawOccupied.add((
+            start: b.endMinutes,
+            end: min(kDayEndMinutes, b.endMinutes + kPostCollegeBufferMinutes),
+          ));
         } else if (labelLower.contains('gym')) {
           // Mandatory 20-min pre-gym buffer
           rawOccupied.add((
             start: max(dayStart, b.startMinutes - kPreGymBufferMinutes),
             end: b.startMinutes,
+          ));
+          // Mandatory 30-min post-gym cooldown & dinner buffer
+          rawOccupied.add((
+            start: b.endMinutes,
+            end: min(kDayEndMinutes, b.endMinutes + kPostGymBufferMinutes),
           ));
         }
       }
@@ -337,15 +423,31 @@ class PlannerService {
       required TaskTarget target,
       required int day,
       required bool affinityOnly,
+      bool affinityPreferred = true,
       int? maxSessionMinutes,
       bool allowNewTargetOnCollegeDay = true,
       bool enforceDailyExertionCap = true,
+      bool allowMultipleSessionsPerDay = false,
+      bool allowFinalTail = false,
     }) {
       final alloc = allocations[target.id]!;
       if (alloc.isFilled) return false;
 
+      // Prevent splintering the same target into multiple short blocks on the same day during primary passes
+      if (!allowMultipleSessionsPerDay && dailyTargetIds[day]!.contains(target.id)) {
+        return false;
+      }
+
       final isCollegeDay = isCollegeWeekday(day);
-      if (alloc.remainingForDay(day, isCollegeDay) <= 0) return false;
+      if (alloc.remainingForDay(
+            day,
+            isCollegeDay,
+            ignoreCapOnFreeDays: ignoreDailyCapOnFreeDays,
+            isUnderPressure: isUnderPressure,
+          ) <=
+          0) {
+        return false;
+      }
 
       final firstFixedStart = isCollegeDay ? getFirstFixedBlockStart(day) : kDayEndMinutes;
 
@@ -362,37 +464,56 @@ class PlannerService {
       if (slots.isEmpty) return false;
 
       final affinitySlots = _getAffinitySlots(slots, target.affinity, day);
+      // Prioritize longest uninterrupted slot so we schedule deep continuous sessions
+      final sortedAffinity = List<FreeSlot>.from(affinitySlots)
+        ..sort((a, b) => b.duration.compareTo(a.duration));
+      final nonAffinity = slots.where((s) => !affinitySlots.contains(s)).toList()
+        ..sort((a, b) => b.duration.compareTo(a.duration));
+
       final candidateSlots = affinityOnly
-          ? affinitySlots
-          : [
-              ...affinitySlots,
-              ...slots.where((s) => !affinitySlots.contains(s)),
-            ];
+          ? sortedAffinity
+          : (affinityPreferred ? [...sortedAffinity, ...nonAffinity] : slots);
 
       for (final slot in candidateSlots) {
         if (slot.duration <= 0) continue;
         if (alloc.isFilled) break;
-        if (alloc.remainingForDay(day, isCollegeDay) <= 0) break;
+        if (alloc.remainingForDay(
+              day,
+              isCollegeDay,
+              ignoreCapOnFreeDays: ignoreDailyCapOnFreeDays,
+              isUnderPressure: isUnderPressure,
+            ) <=
+            0) {
+          break;
+        }
 
         // Guard: On college days, allow strictly at most ONE focus activity before college departure
         final isPreCollegeMorningSlot = isCollegeDay && slot.startMinutes < firstFixedStart;
-        if (isPreCollegeMorningSlot) {
-          final alreadyHasPreCollegeBlock = floatingBlocks.any(
-            (b) => b.dayOfWeek == day && b.startMinutes < firstFixedStart,
-          );
-          if (alreadyHasPreCollegeBlock) continue;
+        if (isPreCollegeMorningSlot &&
+            floatingBlocks.any(
+              (b) => b.dayOfWeek == day && b.startMinutes < firstFixedStart,
+            )) {
+          continue;
         }
 
-        int needed = _calculateAllocation(
+        // Calculate allocation size
+        final needed = _calculateAllocation(
           remaining: alloc.remainingMinutes,
-          dailyRemaining: alloc.remainingForDay(day, isCollegeDay),
+          dailyRemaining: alloc.remainingForDay(
+            day,
+            isCollegeDay,
+            ignoreCapOnFreeDays: ignoreDailyCapOnFreeDays,
+            isUnderPressure: isUnderPressure,
+          ),
           slotDuration: slot.duration,
           maxSessionMinutes: maxSessionMinutes != null
               ? min(maxSessionMinutes, 270)
               : 270,
+          allowFinalTail: allowFinalTail,
         );
 
-        if (needed < kMinBlockMinutes) continue;
+        final minAllowed = allowFinalTail ? 15 : kMinBlockMinutes;
+        if (needed < minAllowed) continue;
 
         // Create the floating block.
         floatingBlocks.add(
@@ -419,8 +540,12 @@ class PlannerService {
           // Insert inter-session rest buffer between consecutive focus activities
           final isWeekend = day == kSaturday || day == kSunday;
           final interSessionBreak = isWeekend
-              ? kWeekendInterSessionBreakMinutes
-              : kWeekdayInterSessionBreakMinutes;
+              ? (isUnderPressure
+                  ? kPressureWeekendBreakMinutes
+                  : kWeekendInterSessionBreakMinutes)
+              : (isUnderPressure
+                  ? kPressureWeekdayBreakMinutes
+                  : kWeekdayInterSessionBreakMinutes);
           slot.startMinutes += needed + interSessionBreak;
 
           if (slot.duration <= 0) {
@@ -432,32 +557,67 @@ class PlannerService {
       return false;
     }
 
-    // ── Pass 1: Weekend & Free-Day Deep Focus Allocation ──
-    // Allocates primary deep blocks on Saturday and Sunday (e.g. CAT 11 AM - 2 PM, SWE afternoon).
-    // This diverts morning study pressure away from hectic weekdays to relaxed weekends.
-    final weekendTargets = List<TaskTarget>.from(sortedTargets)
+    // ── Phase 1: Unified Weekday & Saturday Supply-Demand Allocation ──
+    // Fills natural focus windows (Morning, Afternoon, Late-Night) across Mon-Fri and Saturday
+    // using soft affinity (preferred slots first, fallback slots immediately available).
+
+    // Pass 1.1: Weekday structured primary sessions
+    for (final target in sortedTargets) {
+      final weekdayList = [kMonday, kTuesday, kWednesday, kThursday, kFriday]
+        ..sort(
+          (a, b) => (dayFixedMinutes[a]! + dailyFloatingMinutes[a]!).compareTo(
+            dayFixedMinutes[b]! + dailyFloatingMinutes[b]!,
+          ),
+        );
+
+      for (final day in weekdayList) {
+        if (isWideOpenDay(day)) continue;
+
+        final sessionCap = target.affinity == TimeAffinity.morning
+            ? 180
+            : (target.affinity == TimeAffinity.lateNight ? 150 : 290);
+
+        tryAllocate(
+          target: target,
+          day: day,
+          affinityOnly: false,
+          affinityPreferred: true,
+          maxSessionMinutes: sessionCap,
+          allowNewTargetOnCollegeDay: true,
+        );
+      }
+    }
+
+    // Pass 1.2: Free-Days & Saturday Deep Focus Spillover
+    final spilloverTargets = List<TaskTarget>.from(sortedTargets)
       ..sort((a, b) {
         if (a.priority != b.priority) return a.priority.compareTo(b.priority);
         return _affinityOrder(a.affinity).compareTo(_affinityOrder(b.affinity));
       });
 
-    for (final target in weekendTargets) {
-      for (int day = kMonday; day <= kSunday; day++) {
-        if (!isWideOpenDay(day)) continue;
+    final freeDayCandidates = [
+      kMonday,
+      kTuesday,
+      kWednesday,
+      kThursday,
+      kFriday,
+      kSaturday,
+    ].where((d) => isWideOpenDay(d)).toList();
 
+    for (final target in spilloverTargets) {
+      for (final day in freeDayCandidates) {
         final alloc = allocations[target.id]!;
         if (alloc.isFilled) continue;
 
-        final weekendCap = max(
-          (target.dailyCapMinutes * 1.5).round(),
-          (target.weeklyMinutes / 3).round(),
-        );
+        final maxCap = target.affinity == TimeAffinity.morning ? 300 : 270;
         final deepBlockMinutes = min(
-          alloc.remainingMinutes,
-          min(
-            weekendCap,
-            max(kMinBlockMinutes * 2, (target.weeklyMinutes / 3).round()),
+          alloc.remainingForDay(
+            day,
+            false,
+            ignoreCapOnFreeDays: ignoreDailyCapOnFreeDays,
+            isUnderPressure: isUnderPressure,
           ),
+          min(alloc.remainingMinutes, maxCap),
         );
 
         if (deepBlockMinutes < kMinBlockMinutes) continue;
@@ -465,84 +625,42 @@ class PlannerService {
         tryAllocate(
           target: target,
           day: day,
-          affinityOnly: true,
-          maxSessionMinutes: min(deepBlockMinutes, 270),
+          affinityOnly: false,
+          affinityPreferred: true,
+          maxSessionMinutes: deepBlockMinutes,
           allowNewTargetOnCollegeDay: true,
+          allowMultipleSessionsPerDay: day == kSaturday,
         );
       }
     }
 
-    // ── Pass 2: Weekday Focused Allocation (3 Phase Days: Morning, Afternoon, Late-Night) ──
-    // Fills remaining quotas in light weekday morning (CAT/ECE), afternoon (SWE), and late-night (Freelancing) slots.
-    for (final target in sortedTargets) {
-      final days = List<int>.generate(7, (i) => i + 1)
-        ..sort(
-          (a, b) => (dayFixedMinutes[a]! + dailyFloatingMinutes[a]!).compareTo(
-            dayFixedMinutes[b]! + dailyFloatingMinutes[b]!,
-          ),
-        );
-
-      for (final day in days) {
-        if (isWideOpenDay(day)) continue;
-
-        final sessionCap = target.affinity == TimeAffinity.morning
-            ? 120
-            : (target.affinity == TimeAffinity.lateNight ? 120 : 290);
-
-        tryAllocate(
-          target: target,
-          day: day,
-          affinityOnly: true,
-          maxSessionMinutes: sessionCap,
-          allowNewTargetOnCollegeDay: false, // Enforce 3-target limit
-        );
-      }
-    }
-
-    // ── Pass 3: Fill Remaining Quotas in Preferred Affinity Windows ──
+    // Pass 1.3: Iterative unified balancing across Mon-Sat
     bool madeProgress = true;
     while (madeProgress) {
       madeProgress = false;
-      final days = List<int>.generate(7, (i) => i + 1)
-        ..sort(
+      final activeDays = [
+        kMonday,
+        kTuesday,
+        kWednesday,
+        kThursday,
+        kFriday,
+        kSaturday,
+      ]..sort(
           (a, b) => (dayFixedMinutes[a]! + dailyFloatingMinutes[a]!).compareTo(
             dayFixedMinutes[b]! + dailyFloatingMinutes[b]!,
           ),
         );
 
-      for (final day in days) {
-        for (final target in sortedTargets) {
-          if (tryAllocate(
-            target: target,
-            day: day,
-            affinityOnly: true,
-            allowNewTargetOnCollegeDay: true,
-          )) {
-            madeProgress = true;
-          }
-        }
-      }
-    }
-
-    // ── Pass 4: Flexible Spillover for any Remaining Minutes ──
-    madeProgress = true;
-    while (madeProgress) {
-      madeProgress = false;
-      final days = List<int>.generate(7, (i) => i + 1)
-        ..sort(
-          (a, b) => (dayFixedMinutes[a]! + dailyFloatingMinutes[a]!).compareTo(
-            dayFixedMinutes[b]! + dailyFloatingMinutes[b]!,
-          ),
-        );
-
-      for (final day in days) {
+      for (final day in activeDays) {
         for (final target in sortedTargets) {
           if (tryAllocate(
             target: target,
             day: day,
             affinityOnly: false,
+            affinityPreferred: true,
             allowNewTargetOnCollegeDay: true,
-            enforceDailyExertionCap: true,
+            allowMultipleSessionsPerDay: true,
+            allowFinalTail: false,
           )) {
             madeProgress = true;
           }
@@ -550,8 +668,24 @@ class PlannerService {
       }
     }
 
-    // ── Pass 5: Top-Up Remaining Minutes into Existing Adjacent Blocks ──
-    // Extends existing blocks to absorb remaining quota without creating sub-90m blocks.
+    // ── Phase 2: Sunday Fallback (Only if Mon-Sat Capacity Saturated) ──
+    for (final target in sortedTargets) {
+      final alloc = allocations[target.id]!;
+      if (alloc.isFilled) continue;
+
+      tryAllocate(
+        target: target,
+        day: kSunday,
+        affinityOnly: false,
+        affinityPreferred: true,
+        allowNewTargetOnCollegeDay: true,
+        enforceDailyExertionCap: true,
+        allowMultipleSessionsPerDay: true,
+        allowFinalTail: true,
+      );
+    }
+
+    // ── Phase 3: Unified Crumb & Remainder Top-Up ──
     for (final target in sortedTargets) {
       final alloc = allocations[target.id]!;
       if (alloc.isFilled) continue;
@@ -564,19 +698,10 @@ class PlannerService {
         if (block.parentTargetId != target.id) continue;
 
         final day = block.dayOfWeek;
-        final isCollegeDay = isCollegeWeekday(day);
-        final dailyRem = alloc.remainingForDay(day, isCollegeDay);
-        if (dailyRem <= 0) continue;
-
-        final isWeekend = day == kSaturday || day == kSunday;
-        final interSessionBreak = isWeekend
-            ? kWeekendInterSessionBreakMinutes
-            : kWeekdayInterSessionBreakMinutes;
-
         final slots = freeSlotsByDay[day]!;
         for (final slot in List<FreeSlot>.from(slots)) {
-          final gap = slot.startMinutes - block.endMinutes;
-          if (gap >= 0 && gap <= interSessionBreak && slot.duration > 0) {
+          final gapAfter = slot.startMinutes - block.endMinutes;
+          if (gapAfter >= 0 && gapAfter <= 45 && slot.duration > 0) {
             final toAdd = min(remaining, slot.duration);
             if (toAdd > 0) {
               floatingBlocks[i] = block.copyWith(
@@ -585,6 +710,24 @@ class PlannerService {
               alloc.allocate(day, toAdd);
               dailyFloatingMinutes[day] = dailyFloatingMinutes[day]! + toAdd;
               slot.startMinutes += toAdd;
+              remaining -= toAdd;
+              if (slot.duration <= 0) {
+                slots.remove(slot);
+              }
+              break;
+            }
+          }
+
+          final gapBefore = block.startMinutes - slot.endMinutes;
+          if (gapBefore >= 0 && gapBefore <= 45 && slot.duration > 0) {
+            final toAdd = min(remaining, slot.duration);
+            if (toAdd > 0) {
+              floatingBlocks[i] = block.copyWith(
+                startMinutes: block.startMinutes - toAdd,
+              );
+              alloc.allocate(day, toAdd);
+              dailyFloatingMinutes[day] = dailyFloatingMinutes[day]! + toAdd;
+              slot.endMinutes -= toAdd;
               remaining -= toAdd;
               if (slot.duration <= 0) {
                 slots.remove(slot);
@@ -640,15 +783,14 @@ class PlannerService {
   }
 
   /// Returns slots that overlap with the given affinity window.
-  /// On weekends, late-night tasks (like Freelancing) are flexible across afternoon and night.
+  /// On weekends, tasks are flexible across the entire day to absorb spillover.
   static List<FreeSlot> _getAffinitySlots(
     List<FreeSlot> slots,
     TimeAffinity affinity,
     int day,
   ) {
     if (affinity == TimeAffinity.flexible) return List.from(slots);
-    if ((day == kSaturday || day == kSunday) &&
-        affinity == TimeAffinity.lateNight) {
+    if (day == kSaturday || day == kSunday) {
       return List.from(slots);
     }
 
@@ -689,13 +831,13 @@ class PlannerService {
     }
   }
 
-  /// Calculates how many minutes to allocate from a slot, respecting
-  /// the minimum block size, daily cap, weekly remaining, and optional session limit.
+  /// Calculates the number of minutes to allocate for a session.
   static int _calculateAllocation({
     required int remaining,
     required int dailyRemaining,
     required int slotDuration,
     int? maxSessionMinutes,
+    bool allowFinalTail = false,
   }) {
     if (remaining <= 0) return 0;
 
@@ -712,27 +854,31 @@ class PlannerService {
     }
 
     // Lookahead crumb-prevention:
-    // If allocating `needed` would leave a remainder `leftover` that is between 1 and 89 minutes:
     final leftover = remaining - needed;
     if (leftover > 0 && leftover < kMinBlockMinutes) {
-      // Option A: If today's slot + dailyCap can absorb the leftover, absorb it today.
-      if (remaining <= dailyRemaining &&
-          remaining <= slotDuration &&
-          (maxSessionMinutes == null || remaining <= maxSessionMinutes + 30)) {
+      // If today's slot can absorb the leftover crumb, absorb it today.
+      if (remaining <= slotDuration &&
+          (maxSessionMinutes == null || remaining <= maxSessionMinutes + 45)) {
         needed = remaining;
-      } else {
-        // Option B: Reduce today's allocation so the leftover is >= kMinBlockMinutes (90m),
-        // allowing another day to schedule a valid 90m session.
-        final adjusted = needed - (kMinBlockMinutes - leftover);
-        if (adjusted >= kMinBlockMinutes) {
-          needed = adjusted;
-        }
       }
     }
 
-    // Enforce minimum block size for standalone blocks.
-    if (needed < kMinBlockMinutes) {
+    // Enforce minimum block size for standalone blocks in primary passes.
+    // In spillover / fallback passes (allowFinalTail: true), allow finishing the quota (min 15m).
+    final effectiveMinBlock = allowFinalTail ? 15 : kMinBlockMinutes;
+    if (needed < effectiveMinBlock) {
       return 0; // Can't fit a valid block.
+    }
+
+    // Clean clock snapping to 5-minute multiples where possible
+    if (needed > effectiveMinBlock && needed % 5 != 0) {
+      final snapped = ((needed / 5).round()) * 5;
+      if (snapped <= remaining &&
+          snapped <= dailyRemaining &&
+          snapped <= slotDuration &&
+          snapped >= effectiveMinBlock) {
+        needed = snapped;
+      }
     }
 
     return needed;

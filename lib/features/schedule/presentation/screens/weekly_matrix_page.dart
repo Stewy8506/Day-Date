@@ -39,19 +39,9 @@ class WeeklyMatrixPage extends ConsumerWidget {
                 // ── Header Bar ──────────────────────────────
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '7-DAY OVERVIEW',
-                        style: AppTypography.overline(color: AppColors.textTertiary),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        'Weekly Matrix',
-                        style: AppTypography.editorialHero(color: AppColors.textPrimary),
-                      ),
-                    ],
+                  child: Text(
+                    'Weekly Matrix',
+                    style: AppTypography.editorialHero(color: AppColors.textPrimary),
                   ),
                 ),
 

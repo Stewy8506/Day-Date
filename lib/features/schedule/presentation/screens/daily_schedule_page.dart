@@ -38,7 +38,9 @@ class DailySchedulePage extends ConsumerWidget {
           ),
           data: (result) {
             final dayBlocks = result.dailySchedule[selectedDay] ?? [];
-            final totalMinutes = dayBlocks.fold(0, (sum, b) => sum + b.durationMinutes);
+            final floatingBlocks = dayBlocks.where((b) => b.type == TimeBlockType.floating).toList();
+            final scheduledMinutes = floatingBlocks.fold(0, (sum, b) => sum + b.durationMinutes);
+            final focusCount = floatingBlocks.length;
             final dayName = kDayNames[selectedDay] ?? 'Day $selectedDay';
             final isWeekday = selectedDay >= kMonday && selectedDay <= kFriday;
 
@@ -51,9 +53,9 @@ class DailySchedulePage extends ConsumerWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── 1. Editorial Dateplate & Status Controls ─
+                // ── 1. Unified Editorial Header & Actions ───
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -62,18 +64,13 @@ class DailySchedulePage extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            dayName.toUpperCase(),
-                            style: AppTypography.overline(color: AppColors.textTertiary),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
                             dayName,
                             style: AppTypography.editorialHero(color: AppColors.textPrimary),
                           ),
-                          const SizedBox(height: 1),
+                          const SizedBox(height: 3),
                           Text(
-                            '${formatDuration(totalMinutes)} scheduled · ${dayBlocks.where((b) => b.type == TimeBlockType.floating).length} focus',
-                            style: AppTypography.editorialSubtext(color: AppColors.textSecondary),
+                            '${formatDuration(scheduledMinutes)} scheduled · $focusCount focus',
+                            style: AppTypography.headerSubtext(color: AppColors.textSecondary),
                           ),
                         ],
                       ),
@@ -175,7 +172,7 @@ class DailySchedulePage extends ConsumerWidget {
                   ),
                 ),
 
-                // ── 2. Sleek 7-Day Date Scrubber ──
+                // ── 2. Integrated 7-Day Date Strip ──────────
                 SizedBox(
                   height: 52,
                   child: ListView.builder(
@@ -199,12 +196,6 @@ class DailySchedulePage extends ConsumerWidget {
 
                 const SizedBox(height: 8),
 
-                // Subtle Horizon Dividing Line
-                Container(
-                  height: 1,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  color: AppColors.surfaceBorder.withValues(alpha: 0.6),
-                ),
 
                 // ── 3. Hourly Continuous Timeline (Fluid Day Transition) ───
                 Expanded(

@@ -32,6 +32,16 @@ final plannerServiceProvider = Provider<PlannerService>(
   (ref) => PlannerService(),
 );
 
+/// Provider for user lunch & rest window settings (persisted in Hive metadata).
+final lunchWindowSettingsProvider = StateProvider<LunchWindowSettings>((ref) {
+  return const LunchWindowSettings();
+});
+
+/// Provider for toggling uncapped focus work on off-days (weekends & college-off).
+final ignoreDailyCapOnFreeDaysProvider = StateProvider<bool>((ref) {
+  return false;
+});
+
 // ── Reactive schedule stream ────────────────────────────
 
 /// Provides the computed weekly schedule as a stream.
@@ -40,6 +50,8 @@ final plannerServiceProvider = Provider<PlannerService>(
 final weeklyScheduleProvider = StreamProvider<ScheduleResult>((ref) {
   final repo = ref.watch(scheduleRepositoryProvider);
   final planner = ref.watch(plannerServiceProvider);
+  final lunchSettings = ref.watch(lunchWindowSettingsProvider);
+  final ignoreDailyCapOnFreeDays = ref.watch(ignoreDailyCapOnFreeDaysProvider);
 
   // Build the initial schedule + listen for changes.
   final controller = StreamController<ScheduleResult>();
@@ -53,6 +65,8 @@ final weeklyScheduleProvider = StreamProvider<ScheduleResult>((ref) {
       fixedBlocks: blocks,
       deviations: deviations,
       targets: targets,
+      lunchSettings: lunchSettings,
+      ignoreDailyCapOnFreeDays: ignoreDailyCapOnFreeDays,
     );
 
     controller.add(result);
@@ -214,11 +228,9 @@ final toggleTaskCompletionProvider = Provider<
 
     final completions = await repo.getTaskCompletions();
     final matches = completions.where((c) =>
+        c.dayOfWeek == dayOfWeek &&
         (c.blockId == block.id ||
-            (block.parentTargetId != null &&
-                c.targetId == block.parentTargetId &&
-                c.dayOfWeek == dayOfWeek)) &&
-        c.dateString == date);
+            (block.parentTargetId != null && c.targetId == block.parentTargetId)));
     final existing = matches.isNotEmpty ? matches.first : null;
 
     final newStatus = forceStatus ?? !(existing?.isCompleted ?? false);
@@ -237,6 +249,13 @@ final toggleTaskCompletionProvider = Provider<
     );
 
     await repo.setTaskCompletion(completion);
+
+    // Clean up any duplicate legacy records for this target on this day
+    for (final old in matches) {
+      if (old.id != completion.id) {
+        await repo.removeTaskCompletion(old.id);
+      }
+    }
   };
 });
 

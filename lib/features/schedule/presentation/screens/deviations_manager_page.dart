@@ -10,6 +10,7 @@ import 'package:day_date/core/theme/app_colors.dart';
 import 'package:day_date/core/theme/app_typography.dart';
 import 'package:day_date/core/utils/time_utils.dart';
 import 'package:day_date/features/schedule/application/providers/schedule_providers.dart';
+import 'package:day_date/features/schedule/application/services/planner_service.dart';
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
 import 'package:day_date/features/schedule/presentation/widgets/add_deviation_sheet.dart';
 import 'package:day_date/features/schedule/presentation/widgets/tactile_interactive.dart';
@@ -48,19 +49,9 @@ class DeviationsManagerPage extends ConsumerWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'SCHEDULE CONTROLS',
-                            style: AppTypography.overline(color: AppColors.textTertiary),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            'Overrides & Off-Days',
-                            style: AppTypography.editorialHero(color: AppColors.textPrimary),
-                          ),
-                        ],
+                      Text(
+                        'Overrides & Off-Days',
+                        style: AppTypography.editorialHero(color: AppColors.textPrimary),
                       ),
                       Tactile(
                         onTap: () {
@@ -202,6 +193,216 @@ class DeviationsManagerPage extends ConsumerWidget {
                             );
                           }).toList(),
                         ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // ── Home & Off-Day Lunch / Rest Window ──────
+                      Text(
+                        'HOME & OFF-DAY REST WINDOW',
+                        style: AppTypography.overline(color: AppColors.textTertiary),
+                      ),
+                      const SizedBox(height: 8),
+
+                      Builder(
+                        builder: (context) {
+                          final lunchSettings = ref.watch(lunchWindowSettingsProvider);
+
+                          return Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.surfaceBorder),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Lunch & Recharge Zone',
+                                          style: AppTypography.cardTitle(color: AppColors.textPrimary),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${formatMinutes(lunchSettings.startMinutes)} – ${formatMinutes(lunchSettings.endMinutes)} (${formatDuration(lunchSettings.durationMinutes)})',
+                                          style: AppTypography.caption(
+                                            color: lunchSettings.isEnabled
+                                                ? AppColors.accentWarm
+                                                : AppColors.textTertiary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Tactile(
+                                      onTap: () {
+                                        ref.read(lunchWindowSettingsProvider.notifier).state =
+                                            LunchWindowSettings(
+                                          isEnabled: !lunchSettings.isEnabled,
+                                          startMinutes: lunchSettings.startMinutes,
+                                          endMinutes: lunchSettings.endMinutes,
+                                        );
+                                      },
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 160),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: lunchSettings.isEnabled
+                                              ? AppColors.accentWarmSubtle
+                                              : AppColors.surfaceElevated,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(
+                                            color: lunchSettings.isEnabled
+                                                ? AppColors.accentWarm
+                                                : AppColors.surfaceBorder,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          lunchSettings.isEnabled ? 'Active' : 'Disabled',
+                                          style: AppTypography.overline(
+                                            color: lunchSettings.isEnabled
+                                                ? AppColors.accentWarm
+                                                : AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Automatically reserves this lunch and unwind window on weekends and whenever college is off.',
+                                  style: AppTypography.caption(color: AppColors.textTertiary).copyWith(fontSize: 11),
+                                ),
+                                if (lunchSettings.isEnabled) ...[
+                                  const SizedBox(height: 12),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    children: [
+                                      (start: 780, end: 870, label: '1:00 PM – 2:30 PM'),
+                                      (start: 840, end: 930, label: '2:00 PM – 3:30 PM'),
+                                      (start: 840, end: 960, label: '2:00 PM – 4:00 PM'),
+                                      (start: 780, end: 840, label: '1:00 PM – 2:00 PM'),
+                                    ].map((preset) {
+                                      final isSelected = lunchSettings.startMinutes == preset.start &&
+                                          lunchSettings.endMinutes == preset.end;
+                                      return Tactile(
+                                        onTap: () {
+                                          ref.read(lunchWindowSettingsProvider.notifier).state =
+                                              LunchWindowSettings(
+                                            isEnabled: true,
+                                            startMinutes: preset.start,
+                                            endMinutes: preset.end,
+                                          );
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                          decoration: BoxDecoration(
+                                            color: isSelected ? AppColors.surfaceElevated : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: isSelected
+                                                  ? AppColors.surfaceBorderLight
+                                                  : AppColors.surfaceBorder.withValues(alpha: 0.5),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            preset.label,
+                                            style: AppTypography.overline(
+                                              color: isSelected ? AppColors.textPrimary : AppColors.textTertiary,
+                                            ).copyWith(fontSize: 9.5),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // ── Off-Day Target Cap Policy ──────────────
+                      Text(
+                        'OFF-DAY CAP POLICY',
+                        style: AppTypography.overline(color: AppColors.textTertiary),
+                      ),
+                      const SizedBox(height: 8),
+
+                      Builder(
+                        builder: (context) {
+                          final ignoreCap = ref.watch(ignoreDailyCapOnFreeDaysProvider);
+
+                          return Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.surfaceBorder),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Ignore Daily Caps on Free Days',
+                                        style: AppTypography.cardTitle(color: AppColors.textPrimary),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        ignoreCap
+                                            ? 'Uncapped: targets can absorb massive deep blocks on weekends & off-days.'
+                                            : 'Capped: targets respect standard daily limits to prevent burnout.',
+                                        style: AppTypography.caption(color: AppColors.textTertiary).copyWith(fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Tactile(
+                                  onTap: () {
+                                    ref.read(ignoreDailyCapOnFreeDaysProvider.notifier).state = !ignoreCap;
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 160),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: ignoreCap
+                                          ? AppColors.accentWarmSubtle
+                                          : AppColors.surfaceElevated,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: ignoreCap
+                                            ? AppColors.accentWarm
+                                            : AppColors.surfaceBorder,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      ignoreCap ? 'Uncapped' : 'Enforced',
+                                      style: AppTypography.overline(
+                                        color: ignoreCap
+                                            ? AppColors.accentWarm
+                                            : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
 
                       const SizedBox(height: 20),
