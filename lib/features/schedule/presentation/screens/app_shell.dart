@@ -30,56 +30,74 @@ class AppShell extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: currentIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(
-            top: BorderSide(color: AppColors.surfaceBorder, width: 1),
+      body: Stack(
+        children: [
+          // Primary screen content
+          IndexedStack(
+            index: currentIndex,
+            children: _pages,
           ),
-        ),
-        padding: EdgeInsets.only(
-          top: 6,
-          bottom: MediaQuery.of(context).padding.bottom + 6,
-          left: 12,
-          right: 12,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(
-              ref: ref,
-              index: 0,
-              currentIndex: currentIndex,
-              label: 'Daily',
-              icon: Icons.calendar_today_rounded,
+
+          // Floating Detached Capsule Navigation Island
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 12,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: AppColors.surfaceBorderLight,
+                    width: 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildNavItem(
+                      ref: ref,
+                      index: 0,
+                      currentIndex: currentIndex,
+                      label: 'Daily',
+                      icon: Icons.calendar_today_rounded,
+                    ),
+                    _buildNavItem(
+                      ref: ref,
+                      index: 1,
+                      currentIndex: currentIndex,
+                      label: 'Week',
+                      icon: Icons.view_week_rounded,
+                    ),
+                    _buildNavItem(
+                      ref: ref,
+                      index: 2,
+                      currentIndex: currentIndex,
+                      label: 'Targets',
+                      icon: Icons.track_changes_rounded,
+                    ),
+                    _buildNavItem(
+                      ref: ref,
+                      index: 3,
+                      currentIndex: currentIndex,
+                      label: 'Overrides',
+                      icon: Icons.tune_rounded,
+                    ),
+                  ],
+                ),
+              ),
             ),
-            _buildNavItem(
-              ref: ref,
-              index: 1,
-              currentIndex: currentIndex,
-              label: 'Week',
-              icon: Icons.view_week_rounded,
-            ),
-            _buildNavItem(
-              ref: ref,
-              index: 2,
-              currentIndex: currentIndex,
-              label: 'Targets',
-              icon: Icons.track_changes_rounded,
-            ),
-            _buildNavItem(
-              ref: ref,
-              index: 3,
-              currentIndex: currentIndex,
-              label: 'Overrides',
-              icon: Icons.tune_rounded,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -99,32 +117,39 @@ class AppShell extends ConsumerWidget {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.symmetric(
+          horizontal: isSelected ? 14 : 11,
+          vertical: 6,
+        ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.surfaceElevated : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: isSelected ? AppColors.surfaceBorderLight : Colors.transparent,
+            width: 1.0,
           ),
         ),
-        child: Column(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: 18,
+              size: 16,
               color: isSelected ? AppColors.textPrimary : AppColors.textTertiary,
             ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: AppTypography.caption(
-                color: isSelected ? AppColors.textPrimary : AppColors.textTertiary,
-              ).copyWith(
-                fontSize: 10.5,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            if (isSelected) ...[
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: AppTypography.badge(
+                  color: AppColors.textPrimary,
+                ).copyWith(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

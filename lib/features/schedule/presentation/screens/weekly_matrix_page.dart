@@ -49,7 +49,7 @@ class WeeklyMatrixPage extends ConsumerWidget {
                       const SizedBox(height: 1),
                       Text(
                         'Weekly Matrix',
-                        style: AppTypography.heroTitle(),
+                        style: AppTypography.editorialHero(color: AppColors.textPrimary),
                       ),
                     ],
                   ),

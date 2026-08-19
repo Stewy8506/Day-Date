@@ -487,7 +487,7 @@ class PlannerService {
 
         final sessionCap = target.affinity == TimeAffinity.morning
             ? 120
-            : (target.affinity == TimeAffinity.lateNight ? 120 : 180);
+            : (target.affinity == TimeAffinity.lateNight ? 120 : 290);
 
         tryAllocate(
           target: target,

@@ -172,7 +172,7 @@ class _EditTargetSheetState extends ConsumerState<EditTargetSheet> {
                   children: [
                     Text(
                       _isEditing ? 'Edit Goal Target' : 'Add New Goal',
-                      style: AppTypography.cardTitle(color: AppColors.textPrimary),
+                      style: AppTypography.editorialTitle(color: AppColors.textPrimary).copyWith(fontSize: 18),
                     ),
                     if (_isEditing)
                       Tactile(

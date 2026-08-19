@@ -64,28 +64,29 @@ class TargetsDashboardPage extends ConsumerWidget {
                               const SizedBox(height: 1),
                               Text(
                                 'Goals & Quotas',
-                                style: AppTypography.heroTitle(),
+                                style: AppTypography.editorialHero(color: AppColors.textPrimary),
                               ),
                             ],
                           ),
                           Tactile(
                             onTap: () => EditTargetSheet.show(context),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: AppColors.surfaceElevated,
+                                color: AppColors.surface,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(color: AppColors.surfaceBorder),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.add, size: 14, color: AppColors.accentWarm),
+                                  const Icon(Icons.add_rounded, size: 14, color: AppColors.textPrimary),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'Add Goal',
-                                    style: AppTypography.caption(color: AppColors.accentWarm)
-                                        .copyWith(fontWeight: FontWeight.w600, fontSize: 12),
+                                    'New Goal',
+                                    style: AppTypography.badge(color: AppColors.textPrimary).copyWith(
+                                      fontSize: 11.5,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -99,10 +100,10 @@ class TargetsDashboardPage extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: AppColors.surfaceBorder),
                         ),
                         child: Column(
@@ -112,32 +113,34 @@ class TargetsDashboardPage extends ConsumerWidget {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'OVERALL WEEKLY FULFILLMENT',
+                                  'WEEKLY FULFILLMENT',
                                   style: AppTypography.overline(color: AppColors.textTertiary),
                                 ),
                                 Text(
                                   '${(overallPercent * 100).toInt()}%',
                                   style: AppTypography.monoNumber(
-                                    fontSize: 14,
+                                    fontSize: 13,
                                     color: AppColors.accentWarm,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
                             Text(
-                              '${totalAllocated.toStringAsFixed(1)}h / ${totalRequested.toStringAsFixed(1)}h',
-                              style: AppTypography.sectionTitle(color: AppColors.textPrimary),
+                              '${totalAllocated.toStringAsFixed(1)}h / ${totalRequested.toStringAsFixed(1)}h scheduled',
+                              style: AppTypography.editorialDate(color: AppColors.textPrimary).copyWith(
+                                fontSize: 17,
+                              ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 8),
                             // Progress bar
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(2),
                               child: LinearProgressIndicator(
                                 value: overallPercent,
                                 backgroundColor: AppColors.surfaceElevated,
                                 valueColor: const AlwaysStoppedAnimation(AppColors.accentWarm),
-                                minHeight: 6,
+                                minHeight: 3.5,
                               ),
                             ),
                           ],
@@ -155,6 +158,8 @@ class TargetsDashboardPage extends ConsumerWidget {
                         itemCount: targets.length,
                         itemBuilder: (context, index) {
                           final target = targets[index];
+                          final romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+                          final romanIndex = index < romanNumerals.length ? romanNumerals[index] : '${index + 1}';
                           final completions = ref.watch(rawTaskCompletionsProvider).value ?? [];
                           final extraOvertimeMinutes = completions
                               .where((c) => c.targetId == target.id && c.actualMinutes > c.scheduledMinutes)
@@ -174,14 +179,14 @@ class TargetsDashboardPage extends ConsumerWidget {
                           }
 
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.only(bottom: 10),
                             child: Tactile(
                               onTap: () => EditTargetSheet.show(context, target: target),
                               child: Container(
-                                padding: const EdgeInsets.all(16),
+                                padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
                                   color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(10),
                                   border: Border.all(color: AppColors.surfaceBorder),
                                 ),
                                 child: Column(
@@ -194,19 +199,14 @@ class TargetsDashboardPage extends ConsumerWidget {
                                         Expanded(
                                           child: Row(
                                             children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.surfaceElevated,
-                                                  borderRadius: BorderRadius.circular(4),
-                                                  border: Border.all(color: AppColors.surfaceBorder),
-                                                ),
-                                                child: Text(
-                                                  'P${target.priority}',
-                                                  style: AppTypography.overline(color: AppColors.accentWarm),
+                                              Text(
+                                                '$romanIndex.',
+                                                style: AppTypography.editorialNumeral(
+                                                  color: AppColors.textTertiary,
+                                                  fontSize: 14,
                                                 ),
                                               ),
-                                              const SizedBox(width: 8),
+                                              const SizedBox(width: 6),
                                               Expanded(
                                                 child: Text(
                                                   target.name,
@@ -224,101 +224,100 @@ class TargetsDashboardPage extends ConsumerWidget {
                                             Text(
                                               '${allocated.toStringAsFixed(1)} / ${target.weeklyHours.toStringAsFixed(1)}h',
                                               style: AppTypography.monoNumber(
-                                                fontSize: 13,
+                                                fontSize: 12.5,
                                                 color: AppColors.textPrimary,
                                               ),
                                             ),
                                             const SizedBox(width: 6),
-                                            const Icon(Icons.edit_outlined, size: 14, color: AppColors.textTertiary),
+                                            const Icon(Icons.edit_outlined, size: 13, color: AppColors.textTertiary),
                                           ],
                                         ),
                                       ],
                                     ),
+                                    const SizedBox(height: 8),
 
-                                  const SizedBox(height: 10),
-
-                                  // Progress Bar
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(3),
-                                    child: LinearProgressIndicator(
-                                      value: percent,
-                                      backgroundColor: AppColors.surfaceElevated,
-                                      valueColor: const AlwaysStoppedAnimation(AppColors.accentWarm),
-                                      minHeight: 4,
+                                    // Progress Bar
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(2),
+                                      child: LinearProgressIndicator(
+                                        value: percent,
+                                        backgroundColor: AppColors.surfaceElevated,
+                                        valueColor: const AlwaysStoppedAnimation(AppColors.accentWarm),
+                                        minHeight: 3,
+                                      ),
                                     ),
-                                  ),
 
-                                  const SizedBox(height: 12),
+                                    const SizedBox(height: 10),
 
-                                  // Constraint Metadata Pills
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.background,
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: AppColors.surfaceBorder),
-                                        ),
-                                        child: Text(
-                                          _affinityName(target.affinity),
-                                          style: AppTypography.caption(color: AppColors.textSecondary)
-                                              .copyWith(fontSize: 11),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.background,
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: AppColors.surfaceBorder),
-                                        ),
-                                        child: Text(
-                                          'Cap: ${target.dailyCapHours.toStringAsFixed(1)}h/day',
-                                          style: AppTypography.caption(color: AppColors.textTertiary)
-                                              .copyWith(fontSize: 11),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 10),
-
-                                  // 7-day distribution mini tags
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 4,
-                                    children: List.generate(7, (i) {
-                                      final day = i + 1;
-                                      final dayName = (kDayNames[day] ?? '').substring(0, 3).toUpperCase();
-                                      final mins = dayAllocations[day] ?? 0;
-                                      final isAllocated = mins > 0;
-
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: isAllocated ? AppColors.surfaceElevated : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(4),
-                                          border: Border.all(
-                                            color: isAllocated ? AppColors.accentWarm.withValues(alpha: 0.4) : AppColors.divider,
+                                    // Constraint Metadata Pills
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.surfaceElevated,
+                                            borderRadius: BorderRadius.circular(5),
+                                            border: Border.all(color: AppColors.surfaceBorder),
+                                          ),
+                                          child: Text(
+                                            _affinityName(target.affinity).toUpperCase(),
+                                            style: AppTypography.overline(color: AppColors.textSecondary)
+                                                .copyWith(fontSize: 8.5),
                                           ),
                                         ),
-                                        child: Text(
-                                          isAllocated ? '$dayName ${formatDuration(mins)}' : dayName,
-                                          style: AppTypography.monoTime(
-                                            color: isAllocated ? AppColors.textPrimary : AppColors.textDisabled,
-                                          ).copyWith(fontSize: 9.5),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.surfaceElevated,
+                                            borderRadius: BorderRadius.circular(5),
+                                            border: Border.all(color: AppColors.surfaceBorder),
+                                          ),
+                                          child: Text(
+                                            'CAP ${target.dailyCapHours.toStringAsFixed(1)}H/DAY',
+                                            style: AppTypography.overline(color: AppColors.textTertiary)
+                                                .copyWith(fontSize: 8.5),
+                                          ),
                                         ),
-                                      );
-                                    }),
-                                  ),
-                                ],
+                                      ],
+                                    ),
+
+                                    const SizedBox(height: 10),
+
+                                    // 7-day distribution mini tags
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      children: List.generate(7, (i) {
+                                        final day = i + 1;
+                                        final dayName = (kDayNames[day] ?? '').substring(0, 3).toUpperCase();
+                                        final mins = dayAllocations[day] ?? 0;
+                                        final isAllocated = mins > 0;
+
+                                        return Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: isAllocated ? AppColors.surfaceElevated : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(
+                                              color: isAllocated ? AppColors.accentWarm.withValues(alpha: 0.4) : AppColors.divider,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            isAllocated ? '$dayName ${formatDuration(mins)}' : dayName,
+                                            style: AppTypography.monoTime(
+                                              color: isAllocated ? AppColors.textPrimary : AppColors.textDisabled,
+                                            ).copyWith(fontSize: 9.5),
+                                          ),
+                                        );
+                                      }),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
                       ),
                     ),
                   ],

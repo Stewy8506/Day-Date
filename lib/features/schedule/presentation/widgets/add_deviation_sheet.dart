@@ -85,7 +85,7 @@ class _AddDeviationSheetState extends ConsumerState<AddDeviationSheet> {
                     const SizedBox(height: 1),
                     Text(
                       'Schedule Deviation',
-                      style: AppTypography.sectionTitle(),
+                      style: AppTypography.editorialTitle(color: AppColors.textPrimary),
                     ),
                   ],
                 ),

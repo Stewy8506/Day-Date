@@ -6,7 +6,7 @@ import 'package:day_date/core/theme/app_colors.dart';
 /// Warm greyscale minimalist theme configuration for Day-Date.
 abstract class AppTheme {
   static ThemeData get darkTheme {
-    final textTheme = GoogleFonts.plusJakartaSansTextTheme(
+    final textTheme = GoogleFonts.outfitTextTheme(
       ThemeData.dark().textTheme,
     );
 

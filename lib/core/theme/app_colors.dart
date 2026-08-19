@@ -4,36 +4,36 @@ import 'package:flutter/material.dart';
 /// Inspired by Swiss & Scandinavian industrial minimalism (Braun, Leica, Teenage Engineering).
 abstract class AppColors {
   // ── Canvas & Core Surfaces ────────────────────────────
-  static const Color background = Color(0xFF121211); // Deep warm bistre / charcoal
-  static const Color backgroundElevated = Color(0xFF161514); // Elevated layer
+  static const Color background = Color(0xFF0E0E0D); // Matte carbon-obsidian void
+  static const Color backgroundElevated = Color(0xFF131312); // Slightly raised foundation
   
-  static const Color surface = Color(0xFF1A1918); // Warm graphite card surface
-  static const Color surfaceElevated = Color(0xFF242321); // Active / hover surface
-  static const Color surfaceActive = Color(0xFF2C2A27); // Selected container
+  static const Color surface = Color(0xFF161615); // Flat matte card surface
+  static const Color surfaceElevated = Color(0xFF1F1E1D); // Active / hover surface
+  static const Color surfaceActive = Color(0xFF282725); // Selected container
   
-  // ── Hairline Borders & Dividers ───────────────────────
-  static const Color surfaceBorder = Color(0xFF282623); // Subtle hairline
-  static const Color surfaceBorderLight = Color(0xFF383531); // Focus hairline
-  static const Color divider = Color(0xFF201E1C);
+  // ── Razor-sharp 1px Hairline Borders ──────────────────
+  static const Color surfaceBorder = Color(0xFF262623); // Crisp 1px structural hairline
+  static const Color surfaceBorderLight = Color(0xFF3D3D38); // Focus / active hairline
+  static const Color divider = Color(0xFF1E1E1C);
 
-  // ── Warm Typography ───────────────────────────────────
-  static const Color textPrimary = Color(0xFFF5F3EF); // Warm alabaster / bone
-  static const Color textSecondary = Color(0xFFA39E93); // Warm stone gray
-  static const Color textTertiary = Color(0xFF6E695F); // Warm muted clay
-  static const Color textDisabled = Color(0xFF4A463F);
+  // ── Archival Editorial Typography ─────────────────────
+  static const Color textPrimary = Color(0xFFF5F3EC); // Warm ivory / parchment text
+  static const Color textSecondary = Color(0xFF9E9B91); // Warm stone gray text
+  static const Color textTertiary = Color(0xFF636058); // Muted editorial caption
+  static const Color textDisabled = Color(0xFF42403B);
 
-  // ── Restrained Semantic Accents (Used Sparingly) ───────
-  static const Color accentWarm = Color(0xFFE59500); // Warm amber / ochre for active focus
-  static const Color accentWarmSubtle = Color(0x22E59500);
+  // ── Restrained Semantic Accents ───────────────────────
+  static const Color accentWarm = Color(0xFFE09F3E); // Warm ochre for active focus
+  static const Color accentWarmSubtle = Color(0x22E09F3E);
   
-  static const Color accentTerracotta = Color(0xFFD9534F); // Burnt terracotta for deviations
-  static const Color accentTerracottaSubtle = Color(0x22D9534F);
+  static const Color accentTerracotta = Color(0xFFD95D39); // Burnt terracotta for deviations
+  static const Color accentTerracottaSubtle = Color(0x22D95D39);
   
-  static const Color accentSage = Color(0xFF5E9C76); // Muted sage for free leisure time
-  static const Color accentSageSubtle = Color(0x225E9C76);
+  static const Color accentSage = Color(0xFF5B8E7D); // Muted sage for completed & leisure
+  static const Color accentSageSubtle = Color(0x225B8E7D);
   
-  static const Color accentSteel = Color(0xFF88847C); // Brushed steel for fixed routine anchors
-  static const Color accentSteelSubtle = Color(0x1888847C);
+  static const Color accentSteel = Color(0xFF8C8275); // Warm steel for fixed routine anchors
+  static const Color accentSteelSubtle = Color(0x188C8275);
 
   /// Returns the subtle accent color for a specific block or target name.
   static Color getTargetColor(String label) {
@@ -47,7 +47,7 @@ abstract class AppColors {
     if (clean.contains('outing') || clean.contains('doctor') || clean.contains('deviation')) {
       return accentTerracotta;
     }
-    // Study and deep work targets use warm amber / ochre
+    // Study and deep work targets use warm ochre
     return accentWarm;
   }
 

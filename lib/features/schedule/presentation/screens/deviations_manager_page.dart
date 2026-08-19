@@ -58,7 +58,7 @@ class DeviationsManagerPage extends ConsumerWidget {
                           const SizedBox(height: 1),
                           Text(
                             'Overrides & Off-Days',
-                            style: AppTypography.heroTitle(),
+                            style: AppTypography.editorialHero(color: AppColors.textPrimary),
                           ),
                         ],
                       ),

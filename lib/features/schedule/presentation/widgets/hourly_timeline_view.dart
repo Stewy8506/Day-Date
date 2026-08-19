@@ -105,9 +105,9 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
     return SingleChildScrollView(
       controller: _scrollController,
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 40),
+      padding: const EdgeInsets.only(bottom: 96),
       child: SizedBox(
-        height: totalHeight + 40,
+        height: totalHeight + 96,
         child: Stack(
           children: [
             // ── 1. Hourly Grid Lines & Left Hour Labels ─
@@ -196,48 +196,37 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
                   decoration: BoxDecoration(
                     color: isCompleted
                         ? AppColors.surfaceElevated.withValues(alpha: 0.6)
-                        : AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
+                        : (isFocus
+                            ? const Color(0xFF1B1812)
+                            : (isGym ? const Color(0xFF131A15) : AppColors.surface)),
+                    borderRadius: BorderRadius.circular(11),
                     border: Border.all(
                       color: isCompleted
-                          ? AppColors.accentSage.withValues(alpha: 0.4)
-                          : isFocus
-                              ? AppColors.accentWarm.withValues(alpha: 0.25)
-                              : AppColors.surfaceBorder,
+                          ? AppColors.accentSage.withValues(alpha: 0.35)
+                          : (isFocus
+                              ? AppColors.accentWarm.withValues(alpha: 0.35)
+                              : (isGym
+                                  ? AppColors.accentSage.withValues(alpha: 0.25)
+                                  : AppColors.surfaceBorder)),
                       width: 1.0,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    boxShadow: isFocus && !isCompleted
+                        ? [
+                            BoxShadow(
+                              color: AppColors.accentWarm.withValues(alpha: 0.1),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(11),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // Left Category Accent Node
-                          Container(
-                            width: 3.5,
-                            height: max(22, height - 16),
-                            decoration: BoxDecoration(
-                              color: isCompleted
-                                  ? AppColors.accentSage
-                                  : isFocus
-                                      ? AppColors.accentWarm
-                                      : isGym
-                                          ? AppColors.accentSage
-                                          : AppColors.accentTerracotta,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-
                           // Main Content Area (Tapping opens action sheet)
                           Expanded(
                             child: GestureDetector(
@@ -258,49 +247,14 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // Category Eyebrow Tag
-                                    Row(
-                                      children: [
-                                        Text(
-                                          isFocus
-                                              ? 'FOCUS'
-                                              : isGym
-                                                  ? 'TRAINING'
-                                                  : 'ANCHOR',
-                                          style: AppTypography.overline(
-                                            color: isCompleted
-                                                ? AppColors.accentSage
-                                                : isFocus
-                                                    ? AppColors.accentWarm
-                                                    : AppColors.textTertiary,
-                                          ).copyWith(fontSize: 8.0, height: 1.1),
-                                        ),
-                                        if (isCompleted) ...[
-                                          const SizedBox(width: 5),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.accentSageSubtle,
-                                              borderRadius: BorderRadius.circular(3),
-                                            ),
-                                            child: Text(
-                                              'DONE',
-                                              style: AppTypography.overline(color: AppColors.accentSage)
-                                                  .copyWith(fontSize: 7.5, height: 1.1),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                    const SizedBox(height: 1),
-
                                     // Block Title
                                     Text(
                                       block.label,
                                       style: AppTypography.cardTitle(
                                         color: isCompleted ? AppColors.textSecondary : AppColors.textPrimary,
                                       ).copyWith(
-                                        fontSize: 13.0,
+                                        fontSize: 14.0,
+                                        fontWeight: FontWeight.w600,
                                         height: 1.15,
                                         decoration: isCompleted ? TextDecoration.lineThrough : null,
                                         decorationColor: AppColors.accentSage,
@@ -308,16 +262,34 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    const SizedBox(height: 1),
+                                    const SizedBox(height: 3),
 
-                                    // Time and Duration
-                                    Text(
-                                      '${formatMinutes(block.startMinutes)} – ${formatMinutes(block.endMinutes)} (${formatDuration(block.durationMinutes)})',
-                                      style: AppTypography.monoTime(
-                                        color: isCompleted ? AppColors.textDisabled : AppColors.textSecondary,
-                                      ).copyWith(fontSize: 9.5, height: 1.1),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                    // Status Dot + Time & Duration
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 4.5,
+                                          height: 4.5,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: isCompleted
+                                                ? AppColors.accentSage
+                                                : isFocus
+                                                    ? AppColors.accentWarm
+                                                    : (isGym ? AppColors.accentSage : AppColors.accentSteel),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          '${formatMinutes(block.startMinutes)} – ${formatMinutes(block.endMinutes)} · ${formatDuration(block.durationMinutes)}',
+                                          style: AppTypography.monoTime(
+                                            color: isCompleted ? AppColors.textDisabled : AppColors.textSecondary,
+                                          ).copyWith(fontSize: 10.5, height: 1.1),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -336,10 +308,10 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
                                 );
                               },
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                                 child: Icon(
                                   isCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                                  size: 22,
+                                  size: 18,
                                   color: isCompleted ? AppColors.accentSage : AppColors.textTertiary,
                                 ),
                               ),

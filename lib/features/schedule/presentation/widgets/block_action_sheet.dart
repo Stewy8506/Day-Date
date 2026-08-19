@@ -250,9 +250,9 @@ class _BlockActionSheetState extends ConsumerState<BlockActionSheet> {
                         const SizedBox(height: 3),
                         Text(
                           block.label,
-                          style: AppTypography.sectionTitle(
+                          style: AppTypography.editorialTitle(
                             color: AppColors.textPrimary,
-                          ),
+                          ).copyWith(fontSize: 20),
                         ),
                         const SizedBox(height: 3),
                         Text(

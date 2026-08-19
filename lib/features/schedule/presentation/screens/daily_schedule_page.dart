@@ -11,6 +11,7 @@ import 'package:day_date/core/theme/app_typography.dart';
 import 'package:day_date/core/utils/time_utils.dart';
 import 'package:day_date/features/schedule/application/providers/schedule_providers.dart';
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
+import 'package:day_date/features/schedule/domain/entities/time_block.dart';
 import 'package:day_date/features/schedule/presentation/widgets/add_deviation_sheet.dart';
 import 'package:day_date/features/schedule/presentation/widgets/day_column.dart';
 import 'package:day_date/features/schedule/presentation/widgets/hourly_timeline_view.dart';
@@ -50,65 +51,133 @@ class DailySchedulePage extends ConsumerWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── 1. Top Title & Quick Action ───────────────
+                // ── 1. Editorial Dateplate & Status Controls ─
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'TIMELINE VIEW',
+                            dayName.toUpperCase(),
                             style: AppTypography.overline(color: AppColors.textTertiary),
                           ),
                           const SizedBox(height: 1),
                           Text(
-                            'Daily Schedule',
-                            style: AppTypography.heroTitle(),
+                            dayName,
+                            style: AppTypography.editorialHero(color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            '${formatDuration(totalMinutes)} scheduled · ${dayBlocks.where((b) => b.type == TimeBlockType.floating).length} focus',
+                            style: AppTypography.editorialSubtext(color: AppColors.textSecondary),
                           ),
                         ],
                       ),
-                      // Tactile Add Override Button
-                      Tactile(
-                        onTap: () {
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (_) => const AddDeviationSheet(),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.surfaceBorder),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.add_rounded, size: 16, color: AppColors.textPrimary),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Override',
-                                style: AppTypography.caption(color: AppColors.textPrimary).copyWith(
-                                  fontWeight: FontWeight.w600,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // One-tap College Off toggle for weekdays
+                          if (isWeekday) ...[
+                            Tactile(
+                              onTap: () {
+                                final now = DateTime.now();
+                                final daysUntil = (selectedDay - now.weekday) % 7;
+                                final targetDate = DateTime(now.year, now.month, now.day + daysUntil);
+
+                                ref.read(setCollegeStatusProvider)(
+                                  targetDate,
+                                  isAttending: isCollegeOff, // toggle: if off, set to attending
+                                  strategy: OffDayStrategy.accelerateWeek,
+                                );
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 140),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isCollegeOff
+                                      ? AppColors.accentTerracottaSubtle
+                                      : AppColors.surface,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isCollegeOff
+                                        ? AppColors.accentTerracotta
+                                        : AppColors.surfaceBorder,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 5,
+                                      height: 5,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: isCollegeOff
+                                            ? AppColors.accentTerracotta
+                                            : AppColors.accentSage,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      isCollegeOff ? 'Off' : 'College',
+                                      style: AppTypography.badge(
+                                        color: isCollegeOff
+                                            ? AppColors.accentTerracotta
+                                            : AppColors.textPrimary,
+                                      ).copyWith(fontSize: 11),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+
+                          // Tactile Add Override Button
+                          Tactile(
+                            onTap: () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (_) => const AddDeviationSheet(),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.surfaceBorder),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.add_rounded, size: 14, color: AppColors.textPrimary),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'Override',
+                                    style: AppTypography.badge(color: AppColors.textPrimary).copyWith(
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
                 ),
 
-                // ── 2. Horizontal 7-Day Selector Strip ───────
+                // ── 2. Sleek 7-Day Date Scrubber ──
                 SizedBox(
-                  height: 104,
+                  height: 52,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
@@ -128,97 +197,40 @@ class DailySchedulePage extends ConsumerWidget {
                   ),
                 ),
 
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
 
-                // ── 3. Active Day Subheader & College Toggle ──
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              dayName.toUpperCase(),
-                              style: AppTypography.sectionTitle(color: AppColors.textPrimary),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${dayBlocks.length} blocks • ${formatDuration(totalMinutes)} scheduled',
-                              style: AppTypography.caption(color: AppColors.textSecondary),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-
-                      // One-tap College Off toggle for weekdays
-                      if (isWeekday)
-                        Tactile(
-                          onTap: () {
-                            final now = DateTime.now();
-                            final daysUntil = (selectedDay - now.weekday) % 7;
-                            final targetDate = DateTime(now.year, now.month, now.day + daysUntil);
-
-                            ref.read(setCollegeStatusProvider)(
-                              targetDate,
-                              isAttending: isCollegeOff, // toggle: if off, set to attending
-                              strategy: OffDayStrategy.accelerateWeek,
-                            );
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isCollegeOff
-                                  ? AppColors.accentTerracottaSubtle
-                                  : AppColors.surfaceElevated,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isCollegeOff
-                                    ? AppColors.accentTerracotta
-                                    : AppColors.surfaceBorder,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isCollegeOff
-                                      ? Icons.school_rounded
-                                      : Icons.school_outlined,
-                                  size: 13,
-                                  color: isCollegeOff
-                                      ? AppColors.accentTerracotta
-                                      : AppColors.textSecondary,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  isCollegeOff ? 'College Off' : 'Attending',
-                                  style: AppTypography.overline(
-                                    color: isCollegeOff
-                                        ? AppColors.accentTerracotta
-                                        : AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                // Subtle Horizon Dividing Line
+                Container(
+                  height: 1,
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  color: AppColors.surfaceBorder.withValues(alpha: 0.6),
                 ),
 
-                // ── 4. Hourly Continuous Timeline ───────────
+                // ── 3. Hourly Continuous Timeline (Fluid Day Transition) ───
                 Expanded(
-                  child: HourlyTimelineView(
-                    dayOfWeek: selectedDay,
-                    blocks: dayBlocks,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.0, 0.02),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: KeyedSubtree(
+                      key: ValueKey(selectedDay),
+                      child: HourlyTimelineView(
+                        dayOfWeek: selectedDay,
+                        blocks: dayBlocks,
+                      ),
+                    ),
                   ),
                 ),
               ],
