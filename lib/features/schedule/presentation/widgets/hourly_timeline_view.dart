@@ -43,6 +43,7 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
   static const double kMinutesPerHour = 60.0;
   static const double kPixelsPerMinute = kHourHeight / kMinutesPerHour;
   static const double kTimeColumnWidth = 54.0;
+  static const double kMinFreeGapMinutes = 30.0; // Only show free gaps > 30m
 
   @override
   void initState() {
@@ -87,6 +88,32 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
     );
   }
 
+  /// Compute free time gaps between scheduled blocks.
+  List<({int start, int end})> _computeFreeGaps(List<TimeBlock> sortedBlocks) {
+    final gaps = <({int start, int end})>[];
+    final dayStart = _startHour * 60;
+    final dayEnd = kTimelineEndHour * 60;
+
+    int cursor = dayStart;
+    for (final block in sortedBlocks) {
+      if (block.startMinutes > cursor) {
+        final gapDuration = block.startMinutes - cursor;
+        if (gapDuration >= kMinFreeGapMinutes) {
+          gaps.add((start: cursor, end: block.startMinutes));
+        }
+      }
+      cursor = max(cursor, block.endMinutes);
+    }
+    // Trailing gap after last block
+    if (cursor < dayEnd) {
+      final gapDuration = dayEnd - cursor;
+      if (gapDuration >= kMinFreeGapMinutes) {
+        gaps.add((start: cursor, end: dayEnd));
+      }
+    }
+    return gaps;
+  }
+
   @override
   Widget build(BuildContext context) {
     final completionsAsync = ref.watch(rawTaskCompletionsProvider);
@@ -103,6 +130,8 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
     // Compute free time gaps between sorted scheduled blocks
     final sortedBlocks = List<TimeBlock>.from(widget.blocks)
       ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+    
+    final freeGaps = _computeFreeGaps(sortedBlocks);
 
     return SingleChildScrollView(
       controller: _scrollController,
@@ -169,10 +198,54 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
               );
             }),
 
+            // ── 2.5. Free Time Gap Placeholders ─────────
+            ...freeGaps.map((gap) {
+              final top = (gap.start - (startHour * 60)) * kPixelsPerMinute;
+              final height = (gap.end - gap.start) * kPixelsPerMinute;
+              final gapMinutes = gap.end - gap.start;
+
+              return Positioned(
+                top: top + 2,
+                left: kTimeColumnWidth + 8,
+                right: 16,
+                height: max(36.0, height - 4),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.divider.withValues(alpha: 0.25),
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.wb_sunny_outlined,
+                          size: 11,
+                          color: AppColors.textDisabled.withValues(alpha: 0.7),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Free · ${formatDuration(gapMinutes)}',
+                          style: AppTypography.monoTime(
+                            color: AppColors.textDisabled.withValues(alpha: 0.7),
+                          ).copyWith(fontSize: 10, fontWeight: FontWeight.w400),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+
             // ── 3. Proportional Event Blocks ────────────
             ...sortedBlocks.map((block) {
               final top = (block.startMinutes - (startHour * 60)) * kPixelsPerMinute;
-              final height = max(58.0, (block.durationMinutes * kPixelsPerMinute) - 4);
+              final rawHeight = (block.durationMinutes * kPixelsPerMinute) - 4;
+              final height = max(42.0, rawHeight);
+              final isCompact = rawHeight < 54;
 
               // Find completion record if any
               final completion = completions.cast<TaskCompletion?>().firstWhere(
@@ -188,125 +261,127 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
               final isCompleted = completion?.isCompleted ?? false;
               final isFocus = block.type == TimeBlockType.floating;
               final isGym = block.label.toLowerCase().contains('gym');
+              
+              // Per-target accent color
+              final targetAccent = AppColors.getTargetColor(block.label);
+              
+              // Temporal state: past / current / future
+              final isPast = isToday && block.endMinutes <= nowMinutes;
+              final isCurrent = isToday && block.startMinutes <= nowMinutes && block.endMinutes > nowMinutes;
+              final temporalOpacity = isPast ? 0.5 : 1.0;
+
+              // Background & border colors based on target accent
+              final bgColor = isCompleted
+                  ? AppColors.surfaceElevated.withValues(alpha: 0.4)
+                  : isCurrent
+                      ? targetAccent.withValues(alpha: 0.08)
+                      : (isFocus
+                          ? targetAccent.withValues(alpha: 0.04)
+                          : (isGym ? const Color(0xFF131714) : AppColors.surface));
+              
+              final borderColor = isCompleted
+                  ? AppColors.accentSage.withValues(alpha: 0.25)
+                  : isCurrent
+                      ? targetAccent.withValues(alpha: 0.4)
+                      : (isFocus
+                          ? targetAccent.withValues(alpha: 0.15)
+                          : (isGym
+                              ? const Color(0xFF1E2920)
+                              : AppColors.surfaceBorder));
 
               return Positioned(
                 top: top + 1.5,
                 left: kTimeColumnWidth + 8,
                 right: 16,
                 height: height,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isCompleted
-                        ? AppColors.surfaceElevated.withValues(alpha: 0.4)
-                        : (isFocus
-                            ? const Color(0xFF161614)
-                            : (isGym ? const Color(0xFF131714) : AppColors.surface)),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isCompleted
-                          ? AppColors.accentSage.withValues(alpha: 0.25)
-                          : (isFocus
-                              ? const Color(0xFF2C2A24)
-                              : (isGym
-                                  ? const Color(0xFF1E2920)
-                                  : AppColors.surfaceBorder)),
-                      width: 1.0,
+                child: Opacity(
+                  opacity: temporalOpacity,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: borderColor,
+                        width: isCurrent ? 1.5 : 1.0,
+                      ),
+                      boxShadow: isCurrent
+                          ? [
+                              BoxShadow(
+                                color: targetAccent.withValues(alpha: 0.15),
+                                blurRadius: 8,
+                                spreadRadius: 0,
+                              ),
+                            ]
+                          : null,
                     ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // Main Content Area (Tapping opens action sheet)
+                          // Left accent bar
+                          Container(
+                            width: 3,
+                            decoration: BoxDecoration(
+                              color: isCompleted
+                                  ? AppColors.accentSage
+                                  : targetAccent,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(10),
+                                bottomLeft: Radius.circular(10),
+                              ),
+                            ),
+                          ),
+                          // Content
                           Expanded(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () {
-                                BlockActionSheet.show(
-                                  context,
-                                  block: block,
-                                  dayOfWeek: widget.dayOfWeek,
-                                  completion: completion,
-                                );
-                              },
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: isCompact ? 4 : 8,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  // Block Title
-                                  Text(
-                                    block.label,
-                                    style: AppTypography.cardTitle(
-                                      color: isCompleted ? AppColors.textSecondary : AppColors.textPrimary,
-                                    ).copyWith(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.15,
-                                      decoration: isCompleted ? TextDecoration.lineThrough : null,
-                                      decorationColor: AppColors.accentSage,
+                                  // Main Content Area (Tapping opens action sheet)
+                                  Expanded(
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () {
+                                        BlockActionSheet.show(
+                                          context,
+                                          block: block,
+                                          dayOfWeek: widget.dayOfWeek,
+                                          completion: completion,
+                                        );
+                                      },
+                                      child: isCompact
+                                          ? _buildCompactContent(block, isCompleted, targetAccent, isGym)
+                                          : _buildFullContent(block, isCompleted, targetAccent, isGym),
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: 4),
 
-                                  // Status Dot + Time & Duration
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 4.5,
-                                        height: 4.5,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: isCompleted
-                                              ? AppColors.accentSage
-                                              : isFocus
-                                                  ? AppColors.accentWarm
-                                                  : (isGym ? AppColors.accentSage : AppColors.accentSteel),
+                                  // Dedicated Interactive Done Toggle Checkbox
+                                  if (isFocus)
+                                    GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () {
+                                        ref.read(toggleTaskCompletionProvider)(
+                                          block: block,
+                                          dayOfWeek: widget.dayOfWeek,
+                                        );
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(left: 6, top: 0),
+                                        child: Icon(
+                                          isCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                          size: 18,
+                                          color: isCompleted ? AppColors.accentSage : AppColors.textTertiary,
                                         ),
                                       ),
-                                      const SizedBox(width: 5),
-                                      Flexible(
-                                        child: Text(
-                                          '${formatMinutes(block.startMinutes)} – ${formatMinutes(block.endMinutes)} · ${formatDuration(block.durationMinutes)}',
-                                          style: AppTypography.monoTime(
-                                            color: isCompleted ? AppColors.textDisabled : AppColors.textSecondary,
-                                          ).copyWith(fontSize: 10.5, height: 1.1),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
                                 ],
                               ),
                             ),
                           ),
-
-                          // Dedicated Interactive Done Toggle Checkbox
-                          if (isFocus)
-                            GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () {
-                                ref.read(toggleTaskCompletionProvider)(
-                                  block: block,
-                                  dayOfWeek: widget.dayOfWeek,
-                                );
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 6, top: 0),
-                                child: Icon(
-                                  isCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                                  size: 18,
-                                  color: isCompleted ? AppColors.accentSage : AppColors.textTertiary,
-                                ),
-                              ),
-                            ),
                         ],
                       ),
                     ),
@@ -353,6 +428,93 @@ class _HourlyTimelineViewState extends ConsumerState<HourlyTimelineView> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Full content layout for blocks with enough height (≥ 54px).
+  Widget _buildFullContent(TimeBlock block, bool isCompleted, Color accent, bool isGym) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Block Title
+        Text(
+          block.label,
+          style: AppTypography.cardTitle(
+            color: isCompleted ? AppColors.textSecondary : AppColors.textPrimary,
+          ).copyWith(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            height: 1.15,
+            decoration: isCompleted ? TextDecoration.lineThrough : null,
+            decorationColor: AppColors.accentSage,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+
+        // Status Dot + Time & Duration
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 4.5,
+              height: 4.5,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isCompleted ? AppColors.accentSage : accent,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                '${formatMinutes(block.startMinutes)} – ${formatMinutes(block.endMinutes)} · ${formatDuration(block.durationMinutes)}',
+                style: AppTypography.monoTime(
+                  color: isCompleted ? AppColors.textDisabled : AppColors.textSecondary,
+                ).copyWith(fontSize: 10.5, height: 1.1),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Compact single-line layout for short blocks (< 54px height).
+  /// Prevents overflow by combining title and time into one row.
+  Widget _buildCompactContent(TimeBlock block, bool isCompleted, Color accent, bool isGym) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 4,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isCompleted ? AppColors.accentSage : accent,
+          ),
+        ),
+        const SizedBox(width: 5),
+        Flexible(
+          child: Text(
+            '${block.label} · ${formatDuration(block.durationMinutes)}',
+            style: AppTypography.cardTitle(
+              color: isCompleted ? AppColors.textSecondary : AppColors.textPrimary,
+            ).copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              height: 1.1,
+              decoration: isCompleted ? TextDecoration.lineThrough : null,
+              decorationColor: AppColors.accentSage,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 

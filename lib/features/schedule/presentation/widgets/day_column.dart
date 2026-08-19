@@ -1,4 +1,5 @@
 /// A warm greyscale tactile day capsule in the 7-day selector strip.
+/// Shows the actual date number (e.g., "19") and highlights today.
 library;
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,8 @@ class DayColumn extends StatelessWidget {
   final List<TimeBlock> blocks;
   final bool isSelected;
   final VoidCallback onTap;
+  /// The actual date for this day of the week, if available.
+  final DateTime? date;
 
   const DayColumn({
     super.key,
@@ -21,6 +24,7 @@ class DayColumn extends StatelessWidget {
     required this.blocks,
     required this.isSelected,
     required this.onTap,
+    this.date,
   });
 
   @override
@@ -28,6 +32,16 @@ class DayColumn extends StatelessWidget {
     final dayName = kDayNames[dayOfWeek] ?? '';
     final shortName = dayName.length >= 3 ? dayName.substring(0, 3).toUpperCase() : dayName;
     final hasFocus = blocks.any((b) => b.type == TimeBlockType.floating);
+    
+    // Determine if this is today
+    final now = DateTime.now();
+    final isToday = date != null &&
+        date!.year == now.year &&
+        date!.month == now.month &&
+        date!.day == now.day;
+    
+    // Display the actual date number if available, otherwise the weekday number
+    final dateDisplay = date != null ? '${date!.day}' : '$dayOfWeek';
 
     return Tactile(
       onTap: onTap,
@@ -41,8 +55,10 @@ class DayColumn extends StatelessWidget {
           color: isSelected ? AppColors.surfaceElevated : AppColors.surface.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? AppColors.surfaceBorderLight : AppColors.surfaceBorder,
-            width: 1.0,
+            color: isToday && !isSelected
+                ? AppColors.accentWarm.withValues(alpha: 0.4)
+                : (isSelected ? AppColors.surfaceBorderLight : AppColors.surfaceBorder),
+            width: isToday ? 1.5 : 1.0,
           ),
         ),
         child: FittedBox(
@@ -67,13 +83,15 @@ class DayColumn extends StatelessWidget {
               ),
               const SizedBox(height: 3),
 
-              // Serif Day Index in Newsreader
+              // Date Number (actual date or weekday)
               Text(
-                '$dayOfWeek',
+                dateDisplay,
                 style: AppTypography.editorialNumeral(
-                  color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                  color: isToday
+                      ? AppColors.accentWarm
+                      : (isSelected ? AppColors.textPrimary : AppColors.textSecondary),
                   fontSize: 16,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: isSelected || isToday ? FontWeight.w700 : FontWeight.w500,
                 ).copyWith(height: 1.0),
               ),
               const SizedBox(height: 3),
@@ -86,7 +104,9 @@ class DayColumn extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: isSelected
                       ? AppColors.accentWarm
-                      : (hasFocus ? AppColors.textDisabled : Colors.transparent),
+                      : (isToday
+                          ? AppColors.accentWarm.withValues(alpha: 0.6)
+                          : (hasFocus ? AppColors.textDisabled : Colors.transparent)),
                 ),
               ),
             ],

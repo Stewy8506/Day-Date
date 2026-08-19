@@ -512,7 +512,7 @@ class PlannerService {
           allowFinalTail: allowFinalTail,
         );
 
-        final minAllowed = allowFinalTail ? 15 : kMinBlockMinutes;
+        final minAllowed = kMinBlockMinutes;
         if (needed < minAllowed) continue;
 
         // Create the floating block.
@@ -668,24 +668,56 @@ class PlannerService {
       }
     }
 
-    // ── Phase 2: Sunday Fallback (Only if Mon-Sat Capacity Saturated) ──
+    // Pass 1.4: Saturday Saturation — exhaust Saturday before touching Sunday
+    // Retry all unfilled targets on Saturday with expanded caps and multiple sessions.
     for (final target in sortedTargets) {
       final alloc = allocations[target.id]!;
       if (alloc.isFilled) continue;
 
-      tryAllocate(
-        target: target,
-        day: kSunday,
-        affinityOnly: false,
-        affinityPreferred: true,
-        allowNewTargetOnCollegeDay: true,
-        enforceDailyExertionCap: true,
-        allowMultipleSessionsPerDay: true,
-        allowFinalTail: true,
-      );
+      // Keep trying Saturday until no more progress
+      bool satProgress = true;
+      while (satProgress && !alloc.isFilled) {
+        satProgress = tryAllocate(
+          target: target,
+          day: kSaturday,
+          affinityOnly: false,
+          affinityPreferred: false,
+          allowNewTargetOnCollegeDay: true,
+          allowMultipleSessionsPerDay: true,
+          allowFinalTail: true,
+        );
+      }
+    }
+
+    // ── Phase 2: Sunday Fallback (Only if Mon-Sat Capacity Genuinely Saturated) ──
+    // Check if Saturday has meaningful free capacity remaining
+    final satFreeRemaining = freeSlotsByDay[kSaturday]!
+        .fold(0, (sum, s) => sum + s.duration);
+    final anyUnfilled = sortedTargets.any((t) => !allocations[t.id]!.isFilled);
+
+    if (anyUnfilled && satFreeRemaining < kMinBlockMinutes) {
+      for (final target in sortedTargets) {
+        final alloc = allocations[target.id]!;
+        if (alloc.isFilled) continue;
+
+        bool sunProgress = true;
+        while (sunProgress && !alloc.isFilled) {
+          sunProgress = tryAllocate(
+            target: target,
+            day: kSunday,
+            affinityOnly: false,
+            affinityPreferred: true,
+            allowNewTargetOnCollegeDay: true,
+            enforceDailyExertionCap: true,
+            allowMultipleSessionsPerDay: true,
+            allowFinalTail: true,
+          );
+        }
+      }
     }
 
     // ── Phase 3: Unified Crumb & Remainder Top-Up ──
+    // Step 3a: Extend existing blocks into adjacent free slots
     for (final target in sortedTargets) {
       final alloc = allocations[target.id]!;
       if (alloc.isFilled) continue;
@@ -741,7 +773,53 @@ class PlannerService {
       }
     }
 
+    // Step 3b: Create new small blocks for remaining shortfall (< 45m)
+    // This ensures targets hit 100% quota instead of stalling at 97%.
+    for (final target in sortedTargets) {
+      final alloc = allocations[target.id]!;
+      if (alloc.isFilled) continue;
+
+      final shortfall = alloc.remainingMinutes;
+      if (shortfall <= 0 || shortfall > 60) continue;
+
+      // Try Mon-Sat first, then Sunday
+      final candidateDays = [kMonday, kTuesday, kWednesday, kThursday, kFriday, kSaturday, kSunday];
+      for (final day in candidateDays) {
+        final slots = freeSlotsByDay[day]!;
+        for (final slot in List<FreeSlot>.from(slots)) {
+          if (slot.duration >= shortfall) {
+            final blockDuration = max(kMinBlockMinutes, _snapToCleanDuration(shortfall, isFinishing: true));
+            if (blockDuration < kMinBlockMinutes) continue;
+            final actualDuration = min(blockDuration, slot.duration);
+
+            floatingBlocks.add(
+              TimeBlock(
+                id: '${target.id}_topup_${day}_${slot.startMinutes}',
+                label: target.name,
+                dayOfWeek: day,
+                startMinutes: slot.startMinutes,
+                endMinutes: slot.startMinutes + actualDuration,
+                type: TimeBlockType.floating,
+                parentTargetId: target.id,
+              ),
+            );
+            alloc.allocate(day, actualDuration);
+            dailyFloatingMinutes[day] = dailyFloatingMinutes[day]! + actualDuration;
+            slot.startMinutes += actualDuration;
+            if (slot.duration <= 0) slots.remove(slot);
+            break;
+          }
+        }
+        if (alloc.isFilled) break;
+      }
+    }
+
     // ── Step 4: Build result ─────────────────────────────
+
+    // Safety net: filter out any floating crumbs under kMinBlockMinutes
+    floatingBlocks.removeWhere(
+      (b) => b.type == TimeBlockType.floating && b.durationMinutes < kMinBlockMinutes,
+    );
 
     final dailySchedule = <int, List<TimeBlock>>{};
     for (int day = kMonday; day <= kSunday; day++) {
@@ -831,7 +909,37 @@ class PlannerService {
     }
   }
 
+  /// Snaps a raw duration to a clean human-friendly grid:
+  /// - Blocks ≤ 90m → 15-minute grid (30, 45, 60, 75, 90)
+  /// - Blocks 90–180m → 15-minute grid (1h 30m, 1h 45m, 2h, 2h 15m, ...)
+  /// - Blocks > 180m → 30-minute grid (3h, 3h 30m, 4h, ...)
+  /// When [isFinishing] is true (final quota crumbs), allow 15m minimum.
+  static int _snapToCleanDuration(int rawMinutes, {bool isFinishing = false}) {
+    if (rawMinutes <= 0) return 0;
+    final minBlock = isFinishing ? 15 : kMinBlockMinutes;
+    if (rawMinutes < minBlock) return rawMinutes; // Let caller decide if too small
+
+    int grid;
+    if (rawMinutes <= 90) {
+      grid = 15;
+    } else if (rawMinutes <= 180) {
+      grid = 15;
+    } else {
+      grid = 30;
+    }
+
+    // Snap down to nearest grid line
+    final snapped = (rawMinutes ~/ grid) * grid;
+    // If snapping down would leave us below minimum, snap up instead
+    if (snapped < minBlock) {
+      final snappedUp = ((rawMinutes / grid).ceil()) * grid;
+      return snappedUp;
+    }
+    return snapped;
+  }
+
   /// Calculates the number of minutes to allocate for a session.
+  /// Produces clean, human-friendly durations (multiples of 15m or 30m).
   static int _calculateAllocation({
     required int remaining,
     required int dailyRemaining,
@@ -863,21 +971,27 @@ class PlannerService {
       }
     }
 
-    // Enforce minimum block size for standalone blocks in primary passes.
-    // In spillover / fallback passes (allowFinalTail: true), allow finishing the quota (min 15m).
-    final effectiveMinBlock = allowFinalTail ? 15 : kMinBlockMinutes;
+    // Enforce minimum block size — all floating blocks must be at least kMinBlockMinutes.
+    final effectiveMinBlock = kMinBlockMinutes;
     if (needed < effectiveMinBlock) {
       return 0; // Can't fit a valid block.
     }
 
-    // Clean clock snapping to 5-minute multiples where possible
-    if (needed > effectiveMinBlock && needed % 5 != 0) {
-      final snapped = ((needed / 5).round()) * 5;
-      if (snapped <= remaining &&
-          snapped <= dailyRemaining &&
-          snapped <= slotDuration &&
-          snapped >= effectiveMinBlock) {
-        needed = snapped;
+    // Snap to clean 15m/30m grid for natural-feeling durations
+    final snapped = _snapToCleanDuration(needed, isFinishing: allowFinalTail);
+    if (snapped >= effectiveMinBlock &&
+        snapped <= remaining &&
+        snapped <= dailyRemaining &&
+        snapped <= slotDuration) {
+      needed = snapped;
+    } else if (needed % 5 != 0) {
+      // Fallback: at minimum snap to 5-minute grid
+      final snap5 = (needed ~/ 5) * 5;
+      if (snap5 >= effectiveMinBlock &&
+          snap5 <= remaining &&
+          snap5 <= dailyRemaining &&
+          snap5 <= slotDuration) {
+        needed = snap5;
       }
     }
 

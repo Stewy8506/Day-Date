@@ -10,8 +10,8 @@ import 'package:day_date/core/theme/app_typography.dart';
 import 'package:day_date/features/schedule/application/providers/schedule_providers.dart';
 import 'package:day_date/features/schedule/presentation/screens/daily_schedule_page.dart';
 import 'package:day_date/features/schedule/presentation/screens/deviations_manager_page.dart';
+import 'package:day_date/features/schedule/presentation/screens/monthly_schedule_page.dart';
 import 'package:day_date/features/schedule/presentation/screens/targets_dashboard_page.dart';
-import 'package:day_date/features/schedule/presentation/screens/weekly_matrix_page.dart';
 import 'package:day_date/features/schedule/presentation/widgets/tactile_interactive.dart';
 
 class AppShell extends ConsumerWidget {
@@ -19,7 +19,7 @@ class AppShell extends ConsumerWidget {
 
   static const List<Widget> _pages = [
     DailySchedulePage(),
-    WeeklyMatrixPage(),
+    MonthlySchedulePage(),
     TargetsDashboardPage(),
     DeviationsManagerPage(),
   ];
@@ -75,8 +75,8 @@ class AppShell extends ConsumerWidget {
                       ref: ref,
                       index: 1,
                       currentIndex: currentIndex,
-                      label: 'Week',
-                      icon: Icons.view_week_rounded,
+                      label: 'Month',
+                      icon: Icons.calendar_month_rounded,
                     ),
                     _buildNavItem(
                       ref: ref,

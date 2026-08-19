@@ -35,7 +35,18 @@ abstract class AppColors {
   static const Color accentSteel = Color(0xFF8C8275); // Warm steel for fixed routine anchors
   static const Color accentSteelSubtle = Color(0x188C8275);
 
-  /// Returns the subtle accent color for a specific block or target name.
+  // ── Per-Target Focus Accents ──────────────────────────
+  static const Color accentIndigo = Color(0xFF7B8CDE);   // Soft indigo for Freelancing
+  static const Color accentIndigoSubtle = Color(0x187B8CDE);
+  
+  static const Color accentMauve = Color(0xFFBB86A8);    // Dusty mauve for CAT Prep
+  static const Color accentMauveSubtle = Color(0x18BB86A8);
+  
+  static const Color accentTeal = Color(0xFF5BA4A4);     // Muted teal for additional targets
+  static const Color accentTealSubtle = Color(0x185BA4A4);
+
+  /// Returns the distinct accent color for a specific target name.
+  /// Each target gets a unique color for visual scanning.
   static Color getTargetColor(String label) {
     final clean = label.trim().toLowerCase();
     if (clean.contains('college') || clean.contains('gym') || clean.contains('commute')) {
@@ -47,8 +58,22 @@ abstract class AppColors {
     if (clean.contains('outing') || clean.contains('doctor') || clean.contains('deviation')) {
       return accentTerracotta;
     }
-    // Study and deep work targets use warm ochre
-    return accentWarm;
+    // Per-target unique colors
+    if (clean.contains('swe') || clean.contains('roadmap')) {
+      return accentWarm; // Warm amber
+    }
+    if (clean.contains('cat') || clean.contains('prep')) {
+      return accentMauve; // Dusty mauve
+    }
+    if (clean.contains('freelanc')) {
+      return accentIndigo; // Soft indigo
+    }
+    if (clean.contains('ece') || clean.contains('upkeep')) {
+      return accentTeal; // Muted teal
+    }
+    // Fallback: hash-based color from palette
+    final hash = clean.hashCode.abs() % 4;
+    return [accentWarm, accentIndigo, accentMauve, accentTeal][hash];
   }
 
   /// Returns the subtle background glow for a specific target.

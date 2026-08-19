@@ -182,10 +182,17 @@ class DailySchedulePage extends ConsumerWidget {
                     itemCount: 7,
                     itemBuilder: (context, index) {
                       final day = index + 1;
+                      // Compute the actual date for this weekday in the current week
+                      final now = DateTime.now();
+                      final currentWeekday = now.weekday; // 1=Mon ... 7=Sun
+                      final daysOffset = day - currentWeekday;
+                      final dateForDay = DateTime(now.year, now.month, now.day + daysOffset);
+                      
                       return DayColumn(
                         dayOfWeek: day,
                         blocks: result.dailySchedule[day] ?? [],
                         isSelected: day == selectedDay,
+                        date: dateForDay,
                         onTap: () {
                           ref.read(selectedDayProvider.notifier).state = day;
                         },
