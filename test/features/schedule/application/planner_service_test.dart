@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:day_date/core/constants/schedule_constants.dart';
+import 'package:day_date/core/utils/time_utils.dart';
 import 'package:day_date/features/schedule/application/services/planner_service.dart';
 import 'package:day_date/features/schedule/domain/entities/schedule_deviation.dart';
 import 'package:day_date/features/schedule/domain/entities/task_target.dart';
@@ -143,17 +144,22 @@ void main() {
           reason: 'Sunday should have at least 3 hours of floating work, got ${sunFloating}min');
     });
 
-    test('no scheduled block starts before 7:30 AM (450 min)', () {
+    test('no scheduled block starts before 7:30 AM on weekdays (450 min) or 11:00 AM on weekends (660 min)', () {
       final result = planner.computeWeeklySchedule(
         fixedBlocks: fixedBlocks,
         deviations: [],
         targets: targets,
       );
 
-      for (final dayBlocks in result.dailySchedule.values) {
-        for (final block in dayBlocks) {
-          expect(block.startMinutes, greaterThanOrEqualTo(kDayStartMinutes),
-              reason: '${block.label} starts at ${block.startMinutes}m, before 7:30 AM (450m)');
+      for (final entry in result.dailySchedule.entries) {
+        final day = entry.key;
+        final isWeekend = day == kSaturday || day == kSunday;
+        final expectedStart = isWeekend ? kWeekendStartMinutes : kWeekdayStartMinutes;
+
+        for (final block in entry.value) {
+          expect(block.startMinutes, greaterThanOrEqualTo(expectedStart),
+              reason: '${block.label} on day $day starts at ${block.startMinutes}m, '
+                  'before ${formatMinutes(expectedStart)}');
         }
       }
     });
@@ -211,12 +217,17 @@ void main() {
               .where((b) => b.parentTargetId == target.id)
               .fold(0, (sum, b) => sum + b.durationMinutes);
 
+          final isCollegeDay = day >= kMonday && day <= kFriday;
+          final maxCap = isCollegeDay
+              ? target.dailyCapMinutes
+              : (target.dailyCapMinutes * 1.5).round();
+
           expect(
             targetMinutes,
-            lessThanOrEqualTo(target.dailyCapMinutes),
+            lessThanOrEqualTo(maxCap),
             reason:
                 '${target.name} on day $day: ${targetMinutes}min exceeds '
-                'daily cap of ${target.dailyCapMinutes}min',
+                'daily cap of ${maxCap}min',
           );
         }
       }
@@ -693,10 +704,11 @@ void main() {
             .where((b) => b.parentTargetId == target.id)
             .fold(0, (sum, b) => sum + b.durationMinutes);
 
-        expect(tueMinutes, lessThanOrEqualTo(target.dailyCapMinutes),
+        final maxCap = (target.dailyCapMinutes * 1.5).round();
+        expect(tueMinutes, lessThanOrEqualTo(maxCap),
             reason:
                 '${target.name} on Tuesday: ${tueMinutes}min exceeds '
-                'daily cap of ${target.dailyCapMinutes}min');
+                'daily cap of ${maxCap}min');
       }
     });
 

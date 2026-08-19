@@ -5,7 +5,9 @@ library;
 const int kMinBlockMinutes = 90;
 
 /// Day boundaries (minutes since midnight).
-const int kDayStartMinutes = 450; // 07:30 AM
+const int kWeekdayStartMinutes = 450; // 07:30 AM (Monday - Friday)
+const int kWeekendStartMinutes = 660; // 11:00 AM (Saturday - Sunday)
+const int kDayStartMinutes = 450; // default baseline (07:30 AM)
 const int kDayEndMinutes = 1439; // 23:59 PM
 
 /// Time affinity window boundaries (minutes since midnight).

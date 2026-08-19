@@ -108,7 +108,7 @@ class DailySchedulePage extends ConsumerWidget {
 
                 // ── 2. Horizontal 7-Day Selector Strip ───────
                 SizedBox(
-                  height: 94,
+                  height: 104,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),

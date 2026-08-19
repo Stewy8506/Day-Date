@@ -38,8 +38,8 @@ class DayColumn extends StatelessWidget {
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
         width: 58,
-        margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 3),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.surfaceActive : AppColors.surface,
           borderRadius: BorderRadius.circular(14),
@@ -58,25 +58,26 @@ class DayColumn extends StatelessWidget {
               : null,
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Day Overline (e.g., "MON")
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                shortName,
-                style: AppTypography.overline(
-                  color: isSelected ? AppColors.textPrimary : AppColors.textTertiary,
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  shortName,
+                  style: AppTypography.overline(
+                    color: isSelected ? AppColors.textPrimary : AppColors.textTertiary,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 4),
 
             // Number of blocks badge
             Container(
-              width: 24,
-              height: 24,
+              width: 22,
+              height: 22,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isSelected
@@ -89,23 +90,24 @@ class DayColumn extends StatelessWidget {
                 child: Text(
                   '${blocks.length}',
                   style: AppTypography.monoNumber(
-                    fontSize: 11.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: isSelected ? AppColors.background : AppColors.textSecondary,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 4),
 
             // Scheduled duration in hours
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                '${totalHours}h',
-                style: AppTypography.monoTime(
-                  color: isSelected ? AppColors.textSecondary : AppColors.textTertiary,
-                ).copyWith(fontSize: 10),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '${totalHours}h',
+                  style: AppTypography.monoTime(
+                    color: isSelected ? AppColors.textSecondary : AppColors.textTertiary,
+                  ).copyWith(fontSize: 10),
+                ),
               ),
             ),
           ],
